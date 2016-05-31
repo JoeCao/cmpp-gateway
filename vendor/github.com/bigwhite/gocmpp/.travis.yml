@@ -1,0 +1,15 @@
+language: go
+
+go:
+    - 1.5.1
+    - tip
+os:
+    - linux
+    - osx
+    - windows
+
+env:
+    - GO15VENDOREXPERIMENT="1"
+
+script: 
+    - make
