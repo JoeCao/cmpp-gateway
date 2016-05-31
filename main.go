@@ -6,8 +6,6 @@ import (
 	"github.com/JoeCao/cmpp-gateway/gateway"
 	"log"
 	"net/http"
-	//"go/types"
-	"sort"
 )
 
 func main() {
@@ -61,10 +59,10 @@ func handlerMessage(w http.ResponseWriter, r *http.Request) {
 	m := gateway.SubmitCache.Items()
 	v := make(SmsSlice, 0, len(m))
 	for _, value := range m{
+		//强转value为SmsMessage
 		v = append(v, value.(gateway.SmsMessage))
 	}
-	news := sort.Reverse(v)
-	result, _ := json.Marshal(news)
+	result, _ := json.Marshal()
 	fmt.Fprintf(w, string(result))
 }
 
