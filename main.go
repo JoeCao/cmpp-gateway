@@ -62,7 +62,7 @@ func handlerMessage(w http.ResponseWriter, r *http.Request) {
 		//强转value为SmsMessage
 		v = append(v, value.(gateway.SmsMessage))
 	}
-	result, _ := json.Marshal()
+	result, _ := json.Marshal(v)
 	fmt.Fprintf(w, string(result))
 }
 
