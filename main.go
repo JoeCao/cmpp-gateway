@@ -17,7 +17,9 @@ func main() {
 	//
 	flag.StringVar(&configPath, "c", "", "配置文件路径")
 	flag.Parse()
-
+	if configPath == "" {
+		configPath = "./config.json"
+	}
 	//
 	err := LoadJsonFile(configPath, config)
 	if err == nil {
