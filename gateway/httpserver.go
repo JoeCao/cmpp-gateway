@@ -61,7 +61,12 @@ type Person struct {
 
 
 func index(w http.ResponseWriter, r *http.Request) {
-	t, error := template.New("index.html").ParseFiles("index.html")
+	findTemplate(w, r, "index.html")
+
+}
+
+func findTemplate(w http.ResponseWriter, r *http.Request, tpl string) {
+	t, error := template.New(tpl).ParseFiles(tpl)
 	if error != nil {
 		fmt.Fprintf(w, "template error %v", error)
 		return
@@ -72,12 +77,30 @@ func index(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "error %v", err)
 		return
 	}
-
+}
+func listMessage(w http.ResponseWriter, r *http.Request) {
+	t, error := template.New("list_message.html").ParseFiles("list_message.html")
+	if error != nil {
+		fmt.Fprintf(w, "template error %v", error)
+		return
+	}
+	m := SubmitCache.Items()
+	v := make(SmsSlice, 0, len(m))
+	for _, value := range m {
+		//强转value为SmsMessage
+		v = append(v, value.(SmsMessage))
+	}
+	err := t.Execute(w, v)
+	if err != nil {
+		fmt.Fprintf(w, "error %v", err)
+		return
+	}
 }
 
 func Serve(config *Config) {
 	http.HandleFunc("/send", handler)
 	http.HandleFunc("/messages", handlerMessage)
 	http.HandleFunc("/", index)
+	http.HandleFunc("/list_message", listMessage)
 	log.Fatal(http.ListenAndServe(config.HttpHost+":"+config.HttpPort, nil))
 }
