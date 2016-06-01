@@ -14,30 +14,38 @@ import (
 )
 
 const (
-	user           string        = "104221"
-	password       string        = "051992"
 	connectTimeout time.Duration = time.Second * 2
 )
 
-//var wg sync.WaitGroup
 type SmsMessage struct {
-	Src string
-	Dest string
+	Src     string
+	Dest    string
 	Content string
-	MsgId string
+	MsgId   string
 	Created time.Time
 }
+
+//发送消息队列
 var Messages = make(chan SmsMessage, 10)
-var cancel = make(chan struct{})
+
+//退出消息队列
+var abort = make(chan struct{})
+
+//等待submit结果返回的缓存
 var waitSeqIdCache = cmap.New()
+
+//等待deliver结果返回
 var SubmitCache = cmap.New()
+
+//配置文件
+var config *Config
 
 func startAClient(idx int) {
 	c := cmpp.NewClient(cmpp.V30)
 	ticker := time.NewTicker(time.Second * 30)
 	//defer wg.Done()
 	defer c.Disconnect()
-	err := c.Connect(":7891", user, password, connectTimeout)
+	err := c.Connect(config.CMPPHost + ":" + config.CMPPPort, config.User, config.Password, connectTimeout)
 	if err != nil {
 		log.Printf("client %d: connect error: %s.", idx, err)
 		return
@@ -53,7 +61,7 @@ func startAClient(idx int) {
 				if err != nil {
 					log.Printf("client %d: send cmpp active response error: %s.", idx, err)
 				}
-			case <-cancel:
+			case <-abort:
 				break
 			}
 		}
@@ -78,7 +86,9 @@ func startAClient(idx int) {
 				if mes, ok := waitSeqIdCache.Get(seqId); ok {
 					log.Printf("短信内容: %v, 发送状态 %d", mes, p.Result)
 					waitSeqIdCache.Remove(seqId)
-					SubmitCache.Set(strconv.FormatUint(p.MsgId, 10), mes)
+					sms := mes.(SmsMessage)
+					sms.MsgId = strconv.FormatUint(p.MsgId, 10)
+					SubmitCache.Set(strconv.FormatUint(p.MsgId, 10), sms)
 				}
 			case *cmpp.CmppActiveTestReqPkt:
 				log.Printf("client %d: receive a cmpp active request: %v.", idx, p)
@@ -122,7 +132,7 @@ func startAClient(idx int) {
 		select {
 		case message := <-Messages:
 			log.Printf("mes %v", message)
-			//submit a message
+		//submit a message
 			cont, err := cmpputils.Utf8ToUcs2(message.Content)
 			if err != nil {
 				fmt.Printf("client %d: utf8 to ucs2 transform err: %s.", idx, err)
@@ -133,17 +143,17 @@ func startAClient(idx int) {
 				PkNumber:           1,
 				RegisteredDelivery: 1,
 				MsgLevel:           1,
-				ServiceId:          "JSASXW",
-				FeeUserType:        2,
-				FeeTerminalId:      "1064899104221",
+				ServiceId:          config.ServiceId,
+				FeeUserType:        0,
+				FeeTerminalId:      "",
 				FeeTerminalType:    0,
 				MsgFmt:             8,
 				MsgSrc:             message.Src,
-				FeeType:            "02",
-				FeeCode:            "10",
-				ValidTime:          "151105131555101+",
+				FeeType:            "01",
+				FeeCode:            "000000",
+				ValidTime:          "",
 				AtTime:             "",
-				SrcId:              message.Src,
+				SrcId:              config.SmsAccessNo,
 				DestUsrTl:          1,
 				DestTerminalId:     []string{message.Dest},
 				DestTerminalType:   0,
@@ -159,7 +169,7 @@ func startAClient(idx int) {
 			} else {
 				log.Printf("client %d: send a cmpp3 submit request ok", idx)
 			}
-		case <-cancel:
+		case <-abort:
 			break
 		}
 	}
@@ -168,14 +178,15 @@ func startAClient(idx int) {
 
 func isRunning() bool {
 	select {
-	case <-cancel:
+	case <-abort:
 		return false
 	default:
 		return true
 	}
 }
 
-func StartInput() {
+func StartInput(gconfig *Config) {
+	config = gconfig
 	log.Println("Please input sms context, press return to send  and input 'stop' to quit")
 	//running := true
 	reader := bufio.NewReader(os.Stdin)
@@ -185,14 +196,14 @@ func StartInput() {
 	for isRunning() {
 		data, _, _ := reader.ReadLine()
 		command := string(data)
-		mes := SmsMessage{Content:command, Src:"104221", Dest:"13900001111"}
+		mes := SmsMessage{Content: command, Src: "104221", Dest: "13900001111"}
 
 		Messages <- mes
 		if command == "stop" {
 			//running = false
-			close(cancel)
+			close(abort)
 		}
 		log.Println("command", command)
 	}
-	<-cancel
+	<-abort
 }
