@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>New</title>
+    <!-- 新 Bootstrap 核心 CSS 文件 -->
+    <link rel="stylesheet" href="//cdn.bootcss.com/bootstrap/3.3.5/css/bootstrap.min.css">
+
+    <!-- 可选的Bootstrap主题文件（一般不用引入） -->
+    <link rel="stylesheet" href="//cdn.bootcss.com/bootstrap/3.3.5/css/bootstrap-theme.min.css">
+
+    <link rel="stylesheet"
+          href="https://cdnjs.cloudflare.com/ajax/libs/jquery.bootstrapvalidator/0.5.3/css/bootstrapValidator.css">
+    <!-- Custom styles for this template -->
+    <link href="signin.css" rel="stylesheet">
+    <style type="text/css">
+        body {
+            padding-top: 50px;
+        }
+
+        .form-send {
+            max-width: 330px;
+            padding: 15px;
+            margin: 0 auto;
+        }
+
+    </style>
+</head>
+<body>
+<nav class="navbar navbar-inverse navbar-fixed-top">
+    <div class="container">
+        <div class="navbar-header">
+            <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar"
+                    aria-expanded="false" aria-controls="navbar">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+            </button>
+            <a class="navbar-brand" href="#">移动物联网短信系统</a>
+        </div>
+        <div id="navbar" class="collapse navbar-collapse">
+            <ul class="nav navbar-nav">
+                <li class="active"><a href="/">发送</a></li>
+                <li><a href="#about">历史记录</a></li>
+            </ul>
+        </div><!--/.nav-collapse -->
+    </div>
+</nav>
+<div class="container">
+    <form name="form" class="form-send" data-toggle="validator" role="form">
+        <div class="form-group">
+            <label for="src" class="control-label">源号码</label><br>
+            <input type="radio" name="src" id="src" checked="true" value="104221">104221</label>
+        </div>
+
+        <div class="form-group">
+            <label for="dest" class="control-label">接收号码</label>
+            <input type="tel" name="dest" id="dest" pattern="^1[34578]\d{9}$"
+                   placeholder="输入格式:13822341122" class="form-control" required>
+
+        </div>
+        <div class="form-group">
+            <label for="cont" class="control-label">内容</label>
+            <textarea class="form-control" name="cont" id="cont" rows="3" required></textarea>
+        </div>
+
+        <button class="btn btn-default" type="submit">提交</button>
+
+    </form>
+</div>
+<!-- jQuery文件。务必在bootstrap.min.js 之前引入 -->
+<script src="//cdn.bootcss.com/jquery/1.11.3/jquery.min.js"></script>
+<script>
+    $(document).ready(function () {
+        $('form').submit(function () {
+            $.post("/send", $(this).serialize(), function (data, status) {
+                if (data.result == 0) {
+                    alert("发送成功")
+                } else {
+                    alert("发送失败")
+                }
+            })
+            return false;
+        });
+    });
+</script>
+
+
+<!-- 最新的 Bootstrap 核心 JavaScript 文件 -->
+<script src="//cdn.bootcss.com/bootstrap/3.3.5/js/bootstrap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery.bootstrapvalidator/0.5.3/js/bootstrapValidator.js"></script>
+</body>
+
+</html>

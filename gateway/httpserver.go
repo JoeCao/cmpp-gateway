@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"html/template"
 )
 
 type SmsSlice []SmsMessage
@@ -54,9 +55,29 @@ func handlerMessage(w http.ResponseWriter, r *http.Request) {
 	result, _ := json.Marshal(v)
 	fmt.Fprintf(w, string(result))
 }
+type Person struct {
+    UserName string
+}
+
+
+func index(w http.ResponseWriter, r *http.Request) {
+	t, error := template.New("index.html").ParseFiles("index.html")
+	if error != nil {
+		fmt.Fprintf(w, "template error %v", error)
+		return
+	}
+
+	err := t.Execute(w, struct{}{})
+	if err != nil {
+		fmt.Fprintf(w, "error %v", err)
+		return
+	}
+
+}
 
 func Serve(config *Config) {
 	http.HandleFunc("/send", handler)
 	http.HandleFunc("/messages", handlerMessage)
+	http.HandleFunc("/", index)
 	log.Fatal(http.ListenAndServe(config.HttpHost+":"+config.HttpPort, nil))
 }
