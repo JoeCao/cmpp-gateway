@@ -29,8 +29,8 @@ func main() {
 	}
 	go gateway.StartClient(config)
 	go gateway.StartCmdLine()
-	gateway.Serve(config)
-
+	go gateway.Serve(config)
+	<- gateway.Abort
 }
 
 func LoadJsonFile(filePath string, obj interface{}) error {

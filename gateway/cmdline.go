@@ -16,8 +16,8 @@ func StartCmdLine() {
 
 		Messages <- mes
 		if command == "stop" {
-			//running = false
-			close(abort)
+			close(Abort)
+			break
 		}
 		log.Println("command", command)
 	}

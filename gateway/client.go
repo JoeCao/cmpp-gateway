@@ -20,7 +20,7 @@ const (
 var Messages = make(chan SmsMes, 10)
 
 //退出消息队列
-var abort = make(chan struct{})
+var Abort = make(chan struct{})
 
 //等待submit结果返回的缓存
 var waitSeqIdCache = cmap.New()
@@ -58,7 +58,7 @@ OuterLoop:
 				connectServer()
 				go startReceiver()
 			}
-		case <-abort:
+		case <-Abort:
 			break OuterLoop
 		}
 	}
@@ -170,7 +170,7 @@ OuterLoop:
 			} else {
 				log.Printf("client: send a cmpp3 submit request ok")
 			}
-		case <-abort:
+		case <-Abort:
 			break OuterLoop
 		}
 	}
@@ -179,7 +179,7 @@ OuterLoop:
 
 func isRunning() bool {
 	select {
-	case <-abort:
+	case <-Abort:
 		return false
 	default:
 		return true
@@ -193,6 +193,6 @@ func StartClient(gconfig *Config) {
 	go startReceiver()
 	go activeTimer()
 	defer c.Disconnect()
-	<-abort
+	<-Abort
 
 }
