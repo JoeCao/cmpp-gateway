@@ -1,12 +1,10 @@
 package gateway
 
 import (
-	"bufio"
 	"fmt"
 	"github.com/bigwhite/gocmpp"
 	"github.com/bigwhite/gocmpp/utils"
 	"log"
-	"os"
 	"github.com/streamrail/concurrent-map"
 	"strconv"
 	"time"
@@ -47,6 +45,7 @@ func connectServer() {
 
 func activeTimer() {
 	ticker := time.NewTicker(time.Second * 10)
+OuterLoop:
 	for {
 		select {
 		case <-ticker.C:
@@ -60,7 +59,7 @@ func activeTimer() {
 				go startReceiver()
 			}
 		case <-abort:
-			break
+			break OuterLoop
 		}
 	}
 }
@@ -127,6 +126,7 @@ func startReceiver() {
 }
 
 func startSender() {
+OuterLoop:
 	for {
 		select {
 		case message := <-Messages:
@@ -160,7 +160,10 @@ func startSender() {
 			}
 
 			seq_id, err := c.SendReqPktWithSeqId(p)
+			//赋值default value
 			message.Created = time.Now()
+			message.DelivleryResult = 65535
+		        message.SubmitResult = 65535
 			waitSeqIdCache.Set(strconv.FormatUint(uint64(seq_id), 10), message)
 			if err != nil {
 				log.Printf("client : send a cmpp3 submit request error: %s.", err)
@@ -168,7 +171,7 @@ func startSender() {
 				log.Printf("client: send a cmpp3 submit request ok")
 			}
 		case <-abort:
-			break
+			break OuterLoop
 		}
 	}
 
@@ -185,24 +188,11 @@ func isRunning() bool {
 
 func StartClient(gconfig *Config) {
 	config = gconfig
-	log.Println("Please input sms context, press return to send  and input 'stop' to quit")
-	reader := bufio.NewReader(os.Stdin)
 	connectServer()
 	go startSender()
 	go startReceiver()
 	go activeTimer()
 	defer c.Disconnect()
-	for isRunning() {
-		data, _, _ := reader.ReadLine()
-		command := string(data)
-		mes := SmsMes{Content: command, Src: "104221", Dest: "13900001111"}
-
-		Messages <- mes
-		if command == "stop" {
-			//running = false
-			close(abort)
-		}
-		log.Println("command", command)
-	}
+	<-abort
 
 }
