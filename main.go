@@ -27,7 +27,7 @@ func main() {
 	} else {
 		log.Fatal("加载失败 ", configPath, " => ", err)
 	}
-	go gateway.StartInput(config)
+	go gateway.StartClient(config)
 	gateway.Serve(config)
 
 }
