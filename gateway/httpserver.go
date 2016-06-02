@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"html/template"
+	"sort"
 )
 
 type SmsSlice []SmsMessage
@@ -19,7 +20,7 @@ func (c SmsSlice) Swap(i, j int) {
 }
 
 func (c SmsSlice) Less(i, j int) bool {
-	return c[i].Created.After(c[j].Created)
+	return c[i].Created.Before(c[j].Created)
 }
 
 // handler echoes the HTTP request.
@@ -55,9 +56,7 @@ func handlerMessage(w http.ResponseWriter, r *http.Request) {
 	result, _ := json.Marshal(v)
 	fmt.Fprintf(w, string(result))
 }
-type Person struct {
-    UserName string
-}
+
 
 
 func index(w http.ResponseWriter, r *http.Request) {
@@ -90,6 +89,8 @@ func listMessage(w http.ResponseWriter, r *http.Request) {
 		//强转value为SmsMessage
 		v = append(v, value.(SmsMessage))
 	}
+	//逆序排列
+	sort.Sort(sort.Reverse(v))
 	err := t.Execute(w, v)
 	if err != nil {
 		fmt.Fprintf(w, "error %v", err)
