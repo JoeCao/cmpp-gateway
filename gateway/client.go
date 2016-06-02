@@ -17,7 +17,7 @@ const (
 	connectTimeout time.Duration = time.Second * 2
 )
 
-type SmsMessage struct {
+type SmsMes struct {
 	Src     string
 	Dest    string
 	Content string
@@ -29,7 +29,7 @@ type SmsMessage struct {
 }
 
 //发送消息队列
-var Messages = make(chan SmsMessage, 10)
+var Messages = make(chan SmsMes, 10)
 
 //退出消息队列
 var abort = make(chan struct{})
@@ -97,7 +97,7 @@ func startAClient(idx int) {
 				if mes, ok := waitSeqIdCache.Get(seqId); ok {
 					log.Printf("短信内容: %v, 发送状态 %d", mes, p.Result)
 					waitSeqIdCache.Remove(seqId)
-					sms := mes.(SmsMessage)
+					sms := mes.(SmsMes)
 					sms.MsgId = strconv.FormatUint(p.MsgId, 10)
 					sms.SubmitResult = p.Result
 					SubmitCache.Set(strconv.FormatUint(p.MsgId, 10), sms)
@@ -208,7 +208,7 @@ func StartInput(gconfig *Config) {
 	for isRunning() {
 		data, _, _ := reader.ReadLine()
 		command := string(data)
-		mes := SmsMessage{Content: command, Src: "104221", Dest: "13900001111"}
+		mes := SmsMes{Content: command, Src: "104221", Dest: "13900001111"}
 
 		Messages <- mes
 		if command == "stop" {

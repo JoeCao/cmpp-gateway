@@ -9,17 +9,17 @@ import (
 	"sort"
 )
 
-type SmsSlice []SmsMessage
+type MesSlice []SmsMes
 
-func (c SmsSlice) Len() int {
+func (c MesSlice) Len() int {
 	return len(c)
 }
 
-func (c SmsSlice) Swap(i, j int) {
+func (c MesSlice) Swap(i, j int) {
 	c[i], c[j] = c[j], c[i]
 }
 
-func (c SmsSlice) Less(i, j int) bool {
+func (c MesSlice) Less(i, j int) bool {
 	return c[i].Created.Before(c[j].Created)
 }
 
@@ -38,22 +38,10 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, string(result))
 		return
 	}
-	mes := SmsMessage{Src: src, Content: content, Dest: dest}
+	mes := SmsMes{Src: src, Content: content, Dest: dest}
 	Messages <- mes
 	result, _ := json.Marshal(
 		map[string]interface{}{"error": "", "result": 0})
-	fmt.Fprintf(w, string(result))
-}
-
-func handlerMessage(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-	m := SubmitCache.Items()
-	v := make(SmsSlice, 0, len(m))
-	for _, value := range m {
-		//强转value为SmsMessage
-		v = append(v, value.(SmsMessage))
-	}
-	result, _ := json.Marshal(v)
 	fmt.Fprintf(w, string(result))
 }
 
@@ -84,10 +72,10 @@ func listMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	m := SubmitCache.Items()
-	v := make(SmsSlice, 0, len(m))
+	v := make(MesSlice, 0, len(m))
 	for _, value := range m {
 		//强转value为SmsMessage
-		v = append(v, value.(SmsMessage))
+		v = append(v, value.(SmsMes))
 	}
 	//逆序排列
 	sort.Sort(sort.Reverse(v))
@@ -100,7 +88,6 @@ func listMessage(w http.ResponseWriter, r *http.Request) {
 
 func Serve(config *Config) {
 	http.HandleFunc("/send", handler)
-	http.HandleFunc("/messages", handlerMessage)
 	http.HandleFunc("/", index)
 	http.HandleFunc("/list_message", listMessage)
 	log.Fatal(http.ListenAndServe(config.HttpHost+":"+config.HttpPort, nil))
