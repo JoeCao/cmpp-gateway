@@ -7,7 +7,6 @@ import (
 	"github.com/bigwhite/gocmpp/utils"
 	"log"
 	"os"
-	//"sync"
 	"github.com/streamrail/concurrent-map"
 	"strconv"
 	"time"
@@ -17,15 +16,7 @@ const (
 	connectTimeout time.Duration = time.Second * 2
 )
 
-type SmsMes struct {
-	Src             string
-	Dest            string
-	Content         string
-	MsgId           string
-	Created         time.Time
-	SubmitResult    uint32
-	DelivleryResult uint32
-}
+
 
 //发送消息队列
 var Messages = make(chan SmsMes, 10)
@@ -41,7 +32,7 @@ var SubmitCache = cmap.New()
 
 //配置文件
 var config *Config
-
+//全局的短信cmpp链接
 var c *cmpp.Client
 
 func connectServer() {
@@ -81,8 +72,8 @@ func startReceiver() {
 		}
 		// recv packets
 		i, err := c.RecvAndUnpackPkt(0)
-		//fmt.Println("2" + context)
 		if err != nil {
+			//connect断开后,Recv的不阻塞会导致cpu上升,需要退出goroutine,等待心跳重建接收
 			log.Printf("client : client read and unpack pkt error: %s.", err)
 			break
 		}
@@ -103,7 +94,6 @@ func startReceiver() {
 			log.Printf("client : receive a cmpp active request: %v.", p)
 			rsp := &cmpp.CmppActiveTestRspPkt{}
 			err := c.SendRspPkt(rsp, p.SeqId)
-			//log.Printf("send rsp to cmpp server %v", rsp)
 			if err != nil {
 				log.Printf("client : send cmpp active response error: %s.", err)
 

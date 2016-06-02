@@ -9,19 +9,7 @@ import (
 	"sort"
 )
 
-type MesSlice []SmsMes
 
-func (c MesSlice) Len() int {
-	return len(c)
-}
-
-func (c MesSlice) Swap(i, j int) {
-	c[i], c[j] = c[j], c[i]
-}
-
-func (c MesSlice) Less(i, j int) bool {
-	return c[i].Created.Before(c[j].Created)
-}
 
 // handler echoes the HTTP request.
 func handler(w http.ResponseWriter, r *http.Request) {
