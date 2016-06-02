@@ -23,6 +23,9 @@ type SmsMessage struct {
 	Content string
 	MsgId   string
 	Created time.Time
+	SubmitResult uint32
+	DelivleryResult uint32
+
 }
 
 //发送消息队列
@@ -40,16 +43,23 @@ var SubmitCache = cmap.New()
 //配置文件
 var config *Config
 
-func startAClient(idx int) {
-	c := cmpp.NewClient(cmpp.V30)
-	ticker := time.NewTicker(time.Second * 30)
-	//defer wg.Done()
-	defer c.Disconnect()
+var c *cmpp.Client
+
+func connectServer(idx int) {
+	c = cmpp.NewClient(cmpp.V30)
 	err := c.Connect(config.CMPPHost + ":" + config.CMPPPort, config.User, config.Password, connectTimeout)
 	if err != nil {
 		log.Printf("client %d: connect error: %s.", idx, err)
 		return
 	}
+}
+
+func startAClient(idx int) {
+	connectServer(idx)
+	ticker := time.NewTicker(time.Second * 30)
+	//defer wg.Done()
+	defer c.Disconnect()
+
 	log.Printf("client %d: connect and auth ok", idx)
 	go func() {
 		for {
@@ -60,6 +70,7 @@ func startAClient(idx int) {
 				err := c.SendReqPkt(req)
 				if err != nil {
 					log.Printf("client %d: send cmpp active response error: %s.", idx, err)
+					connectServer(idx)
 				}
 			case <-abort:
 				break
@@ -88,6 +99,7 @@ func startAClient(idx int) {
 					waitSeqIdCache.Remove(seqId)
 					sms := mes.(SmsMessage)
 					sms.MsgId = strconv.FormatUint(p.MsgId, 10)
+					sms.SubmitResult = p.Result
 					SubmitCache.Set(strconv.FormatUint(p.MsgId, 10), sms)
 				}
 			case *cmpp.CmppActiveTestReqPkt:
