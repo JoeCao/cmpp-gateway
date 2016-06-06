@@ -8,6 +8,7 @@ import (
 	"github.com/streamrail/concurrent-map"
 	"strconv"
 	"time"
+	"encoding/json"
 )
 
 const (
@@ -26,12 +27,13 @@ var Abort = make(chan struct{})
 var waitSeqIdCache = cmap.New()
 
 //等待deliver结果返回
-var SubmitCache = cmap.New()
+//var SubmitCache = cmap.New()
 
 //配置文件
 var config *Config
 //全局的短信cmpp链接
 var c *cmpp.Client
+
 
 func connectServer() {
 	c = cmpp.NewClient(cmpp.V30)
@@ -87,7 +89,10 @@ func startReceiver() {
 				sms := mes.(SmsMes)
 				sms.MsgId = strconv.FormatUint(p.MsgId, 10)
 				sms.SubmitResult = p.Result
-				SubmitCache.Set(strconv.FormatUint(p.MsgId, 10), sms)
+				//SubmitCache.Set(strconv.FormatUint(p.MsgId, 10), sms)
+				data,_ := json.Marshal(sms)
+				RedisConn.Do("LPUSH", "submitlist", data)
+				RedisConn.Do("LTRIM", "submitlist", "0", "49")
 			}
 		case *cmpp.CmppActiveTestReqPkt:
 			log.Printf("client : receive a cmpp active request: %v.", p)

@@ -22,6 +22,8 @@ type Config struct {
 	CMPPHost string `json:"cmpp_host"`
 	CMPPPort string `json:"cmpp_port"`
 	Debug    bool   `json:"debug"`
+	RedisHost string `json:"redis_host"`
+	RedisPort string `json:"redis_port"`
 }
 
 func (c *Config) LoadFile(path string) {

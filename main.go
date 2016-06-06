@@ -29,7 +29,9 @@ func main() {
 	}
 	go gateway.StartClient(config)
 	go gateway.StartCmdLine()
+	go gateway.StartRedis(config)
 	go gateway.Serve(config)
+
 	<- gateway.Abort
 }
 
