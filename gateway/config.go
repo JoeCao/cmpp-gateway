@@ -22,6 +22,7 @@ type Config struct {
 	CMPPHost string `json:"cmpp_host"`
 	CMPPPort string `json:"cmpp_port"`
 	Debug    bool   `json:"debug"`
+	CacheTTL      uint32    `json:"cache_ttl"`
 }
 
 func (c *Config) LoadFile(path string) {

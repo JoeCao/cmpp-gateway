@@ -59,7 +59,9 @@ func listMessage(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "template error %v", error)
 		return
 	}
-	m := SubmitCache.Items()
+
+	m := SubmitCache.GetItems()
+
 	v := make(MesSlice, 0, len(m))
 	for _, value := range m {
 		//强转value为SmsMessage

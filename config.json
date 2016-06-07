@@ -7,5 +7,6 @@
   "http_port": "8000",
   "cmpp_host": "127.0.0.1",
   "cmpp_port": "7891",
-  "debug": true
+  "debug": true,
+  "cache_ttl": 100
 }

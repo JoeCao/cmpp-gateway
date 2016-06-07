@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"github.com/bigwhite/gocmpp"
 	"github.com/bigwhite/gocmpp/utils"
+	"github.com/diegobernardes/ttlcache"
 	"log"
-	"github.com/streamrail/concurrent-map"
 	"strconv"
 	"time"
 )
@@ -14,8 +14,6 @@ const (
 	connectTimeout time.Duration = time.Second * 2
 )
 
-
-
 //发送消息队列
 var Messages = make(chan SmsMes, 10)
 
@@ -23,19 +21,20 @@ var Messages = make(chan SmsMes, 10)
 var Abort = make(chan struct{})
 
 //等待submit结果返回的缓存
-var waitSeqIdCache = cmap.New()
+var waitSeqIdCache = ttlcache.NewCache()
 
 //等待deliver结果返回
-var SubmitCache = cmap.New()
+var SubmitCache = ttlcache.NewCache()
 
 //配置文件
 var config *Config
+
 //全局的短信cmpp链接
 var c *cmpp.Client
 
 func connectServer() {
 	c = cmpp.NewClient(cmpp.V30)
-	err := c.Connect(config.CMPPHost + ":" + config.CMPPPort, config.User, config.Password, connectTimeout)
+	err := c.Connect(config.CMPPHost+":"+config.CMPPPort, config.User, config.Password, connectTimeout)
 	if err != nil {
 		log.Printf("client connect error: %s.", err)
 		return
@@ -163,7 +162,7 @@ OuterLoop:
 			//赋值default value
 			message.Created = time.Now()
 			message.DelivleryResult = 65535
-		        message.SubmitResult = 65535
+			message.SubmitResult = 65535
 			waitSeqIdCache.Set(strconv.FormatUint(uint64(seq_id), 10), message)
 			if err != nil {
 				log.Printf("client : send a cmpp3 submit request error: %s.", err)
@@ -188,6 +187,8 @@ func isRunning() bool {
 
 func StartClient(gconfig *Config) {
 	config = gconfig
+	SubmitCache.SetTTL(time.Duration(time.Duration(config.CacheTTL) * time.Second))
+	waitSeqIdCache.SetTTL(time.Duration(time.Duration(config.CacheTTL) * time.Second))
 	connectServer()
 	go startSender()
 	go startReceiver()
