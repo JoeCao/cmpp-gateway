@@ -31,7 +31,7 @@ var c *cmpp.Client
 
 func connectServer() {
 	c = cmpp.NewClient(cmpp.V30)
-	err := c.Connect(config.CMPPHost+":"+config.CMPPPort, config.User, config.Password, connectTimeout)
+	err := c.Connect(config.CMPPHost + ":" + config.CMPPPort, config.User, config.Password, connectTimeout)
 	if err != nil {
 		log.Printf("client connect error: %s.", err)
 		return
@@ -41,7 +41,7 @@ func connectServer() {
 
 func activeTimer() {
 	ticker := time.NewTicker(time.Second * 10)
-OuterLoop:
+	OuterLoop:
 	for {
 		select {
 		case <-ticker.C:
@@ -127,13 +127,27 @@ func startReceiver() {
 				log.Printf("client: send cmpp delivery report request error: %s.", err)
 			}
 
+			mes := SmsMes{}
+			//根据短信网关的返回值给mes赋值
+			mes.MsgId = strconv.FormatUint(p.MsgId, 10)
+			mes.Src = p.SrcTerminalId
+			mes.Content = p.MsgContent
+			mes.Created = time.Now()
+			mes.Dest = p.DestId
+			//将submit结果提交到redis的队列存放
+			data, _ := json.Marshal(mes)
+			//新的记录加在头部,自然就倒序排列了
+			RedisConn.Do("LPUSH", "molist", data)
+			//只保留最近五十条
+			RedisConn.Do("LTRIM", "molist", 0, 49)
+
 		}
 	}
 
 }
 
 func startSender() {
-OuterLoop:
+	OuterLoop:
 	for {
 		select {
 		case message := <-Messages:
@@ -167,11 +181,11 @@ OuterLoop:
 			}
 
 			seq_id, err := c.SendReqPktWithSeqId(p)
-			//赋值default value
+		//赋值default value
 			message.Created = time.Now()
 			message.DelivleryResult = 65535
 			message.SubmitResult = 65535
-			//将发送的记录转为json放到redis中保存下来,为异步返回的submit reponse做准备
+		//将发送的记录转为json放到redis中保存下来,为异步返回的submit reponse做准备
 			data, _ := json.Marshal(message)
 			RedisConn.Do("HSET", "waitseqcache", strconv.FormatUint(uint64(seq_id), 10), data)
 			if err != nil {

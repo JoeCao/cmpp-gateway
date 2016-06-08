@@ -74,9 +74,35 @@ func listMessage(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func listMo(w http.ResponseWriter, r *http.Request) {
+	t, error := template.New("list_mo.html").ParseFiles("list_mo.html")
+	if error != nil {
+		fmt.Fprintf(w, "template error %v", error)
+		return
+	}
+	values, err := redis.Strings(RedisConn.Do("LRANGE", "molist", 0, -1))
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	v := make([]SmsMes, 0, len(values))
+	for _, s := range values {
+		mes := SmsMes{}
+		json.Unmarshal([]byte(s), &mes)
+		v = append(v, mes)
+	}
+
+	err = t.Execute(w, v)
+	if err != nil {
+		fmt.Fprintf(w, "error %v", err)
+		return
+	}
+}
+
 func Serve(config *Config) {
 	http.HandleFunc("/send", handler)
 	http.HandleFunc("/", index)
 	http.HandleFunc("/list_message", listMessage)
+	http.HandleFunc("/list_mo", listMo)
 	log.Fatal(http.ListenAndServe(config.HttpHost+":"+config.HttpPort, nil))
 }
