@@ -1,11 +1,12 @@
 package gateway
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/bigwhite/gocmpp"
 	"github.com/bigwhite/gocmpp/utils"
+	"github.com/garyburd/redigo/redis"
 	"log"
-	"github.com/streamrail/concurrent-map"
 	"strconv"
 	"time"
 )
@@ -14,22 +15,17 @@ const (
 	connectTimeout time.Duration = time.Second * 2
 )
 
-
-
 //发送消息队列
 var Messages = make(chan SmsMes, 10)
 
 //退出消息队列
 var Abort = make(chan struct{})
 
-//等待submit结果返回的缓存
-var waitSeqIdCache = cmap.New()
 
-//等待deliver结果返回
-var SubmitCache = cmap.New()
 
 //配置文件
 var config *Config
+
 //全局的短信cmpp链接
 var c *cmpp.Client
 
@@ -45,7 +41,7 @@ func connectServer() {
 
 func activeTimer() {
 	ticker := time.NewTicker(time.Second * 10)
-OuterLoop:
+	OuterLoop:
 	for {
 		select {
 		case <-ticker.C:
@@ -81,13 +77,24 @@ func startReceiver() {
 		case *cmpp.Cmpp3SubmitRspPkt:
 			log.Printf("client : receive a cmpp3 submit response: %v.", p)
 			seqId := strconv.FormatUint(uint64(p.SeqId), 10)
-			if mes, ok := waitSeqIdCache.Get(seqId); ok {
+			//从redis中取出seqId为主键的对应发送消息
+			ret, _ := redis.String(RedisConn.Do("HGET", "waitseqcache", seqId))
+			if ret != "" {
+				mes := SmsMes{}
+				//从json还原为对象
+				json.Unmarshal([]byte(ret), &mes)
 				log.Printf("短信内容: %v, 发送状态 %d", mes, p.Result)
-				waitSeqIdCache.Remove(seqId)
-				sms := mes.(SmsMes)
-				sms.MsgId = strconv.FormatUint(p.MsgId, 10)
-				sms.SubmitResult = p.Result
-				SubmitCache.Set(strconv.FormatUint(p.MsgId, 10), sms)
+				//删除临时的缓存
+				RedisConn.Do("HDEL", "waitseqcache", seqId)
+				//根据短信网关的返回值给mes赋值
+				mes.MsgId = strconv.FormatUint(p.MsgId, 10)
+				mes.SubmitResult = p.Result
+				//将submit结果提交到redis的队列存放
+				data, _ := json.Marshal(mes)
+				//新的记录加在头部,自然就倒序排列了
+				RedisConn.Do("LPUSH", "submitlist", data)
+				//只保留最近五十条
+				RedisConn.Do("LTRIM", "submitlist", "0", "49")
 			}
 		case *cmpp.CmppActiveTestReqPkt:
 			log.Printf("client : receive a cmpp active request: %v.", p)
@@ -120,13 +127,27 @@ func startReceiver() {
 				log.Printf("client: send cmpp delivery report request error: %s.", err)
 			}
 
+			mes := SmsMes{}
+			//根据短信网关的返回值给mes赋值
+			mes.MsgId = strconv.FormatUint(p.MsgId, 10)
+			mes.Src = p.SrcTerminalId
+			mes.Content = p.MsgContent
+			mes.Created = time.Now()
+			mes.Dest = p.DestId
+			//将submit结果提交到redis的队列存放
+			data, _ := json.Marshal(mes)
+			//新的记录加在头部,自然就倒序排列了
+			RedisConn.Do("LPUSH", "molist", data)
+			//只保留最近五十条
+			RedisConn.Do("LTRIM", "molist", 0, 49)
+
 		}
 	}
 
 }
 
 func startSender() {
-OuterLoop:
+	OuterLoop:
 	for {
 		select {
 		case message := <-Messages:
@@ -160,11 +181,13 @@ OuterLoop:
 			}
 
 			seq_id, err := c.SendReqPktWithSeqId(p)
-			//赋值default value
+		//赋值default value
 			message.Created = time.Now()
 			message.DelivleryResult = 65535
-		        message.SubmitResult = 65535
-			waitSeqIdCache.Set(strconv.FormatUint(uint64(seq_id), 10), message)
+			message.SubmitResult = 65535
+		//将发送的记录转为json放到redis中保存下来,为异步返回的submit reponse做准备
+			data, _ := json.Marshal(message)
+			RedisConn.Do("HSET", "waitseqcache", strconv.FormatUint(uint64(seq_id), 10), data)
 			if err != nil {
 				log.Printf("client : send a cmpp3 submit request error: %s.", err)
 			} else {
