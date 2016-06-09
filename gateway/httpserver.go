@@ -3,7 +3,6 @@ package gateway
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/garyburd/redigo/redis"
 	"html/template"
 	"log"
 	"net/http"
@@ -50,22 +49,12 @@ func findTemplate(w http.ResponseWriter, r *http.Request, tpl string) {
 	}
 }
 func listMessage(w http.ResponseWriter, r *http.Request) {
-	t, error := template.New("list_message.html").ParseFiles("list_message.html")
-	if error != nil {
-		fmt.Fprintf(w, "template error %v", error)
-		return
-	}
-	values, err := redis.Strings(RedisConn.Do("LRANGE", "submitlist", 0, -1))
+	t, err := template.New("list_message.html").ParseFiles("list_message.html")
 	if err != nil {
-		fmt.Println(err)
+		fmt.Fprintf(w, "template error %v", err)
 		return
 	}
-	v := make([]SmsMes, 0, len(values))
-	for _, s := range values {
-		mes := SmsMes{}
-		json.Unmarshal([]byte(s), &mes)
-		v = append(v, mes)
-	}
+	v := SCache.GetSubmits()
 
 	err = t.Execute(w, v)
 	if err != nil {
@@ -75,22 +64,12 @@ func listMessage(w http.ResponseWriter, r *http.Request) {
 }
 
 func listMo(w http.ResponseWriter, r *http.Request) {
-	t, error := template.New("list_mo.html").ParseFiles("list_mo.html")
-	if error != nil {
-		fmt.Fprintf(w, "template error %v", error)
-		return
-	}
-	values, err := redis.Strings(RedisConn.Do("LRANGE", "molist", 0, -1))
+	t, err := template.New("list_mo.html").ParseFiles("list_mo.html")
 	if err != nil {
-		fmt.Println(err)
+		fmt.Fprintf(w, "template error %v", err)
 		return
 	}
-	v := make([]SmsMes, 0, len(values))
-	for _, s := range values {
-		mes := SmsMes{}
-		json.Unmarshal([]byte(s), &mes)
-		v = append(v, mes)
-	}
+	v := SCache.GetMoList()
 
 	err = t.Execute(w, v)
 	if err != nil {
@@ -104,5 +83,5 @@ func Serve(config *Config) {
 	http.HandleFunc("/", index)
 	http.HandleFunc("/list_message", listMessage)
 	http.HandleFunc("/list_mo", listMo)
-	log.Fatal(http.ListenAndServe(config.HttpHost+":"+config.HttpPort, nil))
+	log.Fatal(http.ListenAndServe(config.HttpHost + ":" + config.HttpPort, nil))
 }

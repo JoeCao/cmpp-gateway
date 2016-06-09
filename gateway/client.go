@@ -1,11 +1,9 @@
 package gateway
 
 import (
-	"encoding/json"
 	"fmt"
 	"github.com/bigwhite/gocmpp"
 	"github.com/bigwhite/gocmpp/utils"
-	"github.com/garyburd/redigo/redis"
 	"log"
 	"strconv"
 	"time"
@@ -76,25 +74,15 @@ func startReceiver() {
 		switch p := i.(type) {
 		case *cmpp.Cmpp3SubmitRspPkt:
 			log.Printf("client : receive a cmpp3 submit response: %v.", p)
-			seqId := strconv.FormatUint(uint64(p.SeqId), 10)
+			//seqId := strconv.FormatUint(uint64(p.SeqId), 10)
 			//从redis中取出seqId为主键的对应发送消息
-			ret, _ := redis.String(RedisConn.Do("HGET", "waitseqcache", seqId))
-			if ret != "" {
-				mes := SmsMes{}
-				//从json还原为对象
-				json.Unmarshal([]byte(ret), &mes)
+			mes, err := SCache.GetWaitCache(p.SeqId)
+			if err == nil {
 				log.Printf("短信内容: %v, 发送状态 %d", mes, p.Result)
-				//删除临时的缓存
-				RedisConn.Do("HDEL", "waitseqcache", seqId)
 				//根据短信网关的返回值给mes赋值
 				mes.MsgId = strconv.FormatUint(p.MsgId, 10)
 				mes.SubmitResult = p.Result
-				//将submit结果提交到redis的队列存放
-				data, _ := json.Marshal(mes)
-				//新的记录加在头部,自然就倒序排列了
-				RedisConn.Do("LPUSH", "submitlist", data)
-				//只保留最近五十条
-				RedisConn.Do("LTRIM", "submitlist", "0", "49")
+				SCache.AddSubmits(mes)
 			}
 		case *cmpp.CmppActiveTestReqPkt:
 			log.Printf("client : receive a cmpp active request: %v.", p)
@@ -134,12 +122,7 @@ func startReceiver() {
 			mes.Content = p.MsgContent
 			mes.Created = time.Now()
 			mes.Dest = p.DestId
-			//将submit结果提交到redis的队列存放
-			data, _ := json.Marshal(mes)
-			//新的记录加在头部,自然就倒序排列了
-			RedisConn.Do("LPUSH", "molist", data)
-			//只保留最近五十条
-			RedisConn.Do("LTRIM", "molist", 0, 49)
+			SCache.AddMoList(mes)
 
 		}
 	}
@@ -185,9 +168,7 @@ func startSender() {
 			message.Created = time.Now()
 			message.DelivleryResult = 65535
 			message.SubmitResult = 65535
-		//将发送的记录转为json放到redis中保存下来,为异步返回的submit reponse做准备
-			data, _ := json.Marshal(message)
-			RedisConn.Do("HSET", "waitseqcache", strconv.FormatUint(uint64(seq_id), 10), data)
+			SCache.SetWaitCache(seq_id, message)
 			if err != nil {
 				log.Printf("client : send a cmpp3 submit request error: %s.", err)
 			} else {
