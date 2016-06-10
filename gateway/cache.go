@@ -63,8 +63,7 @@ func (c *Cache)GetSubmits() *[]SmsMes {
 	values, err := redis.Strings(c.conn.Do("LRANGE", "submitlist", 0, -1))
 	if err != nil {
 		fmt.Println(err)
-		nullList := make([]SmsMes,0,0)
-		return &nullList
+		return &[]SmsMes{}
 	}
 	v := make([]SmsMes, 0, len(values))
 	for _, s := range values {
@@ -89,8 +88,7 @@ func (c *Cache)GetMoList() *[]SmsMes {
 	if err != nil {
 		fmt.Println(err)
 		//返回空对象
-		nullList := make([]SmsMes,0,0)
-		return &nullList
+		return &[]SmsMes{}
 	}
 	v := make([]SmsMes, 0, len(values))
 	for _, s := range values {
