@@ -82,7 +82,7 @@ func startReceiver() {
 				//根据短信网关的返回值给mes赋值
 				mes.MsgId = strconv.FormatUint(p.MsgId, 10)
 				mes.SubmitResult = p.Result
-				SCache.AddSubmits(mes)
+				SCache.AddSubmits(&mes)
 			}
 		case *cmpp.CmppActiveTestReqPkt:
 			log.Printf("client : receive a cmpp active request: %v.", p)
@@ -122,7 +122,7 @@ func startReceiver() {
 			mes.Content = p.MsgContent
 			mes.Created = time.Now()
 			mes.Dest = p.DestId
-			SCache.AddMoList(mes)
+			SCache.AddMoList(&mes)
 
 		}
 	}

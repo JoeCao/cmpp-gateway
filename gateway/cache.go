@@ -50,7 +50,7 @@ func (c *Cache)GetWaitCache(key uint32) (SmsMes, error) {
 
 }
 
-func (c *Cache)AddSubmits(mes SmsMes) {
+func (c *Cache)AddSubmits(mes *SmsMes) {
 	//将submit结果提交到redis的队列存放
 	data, _ := json.Marshal(mes)
 	//新的记录加在头部,自然就倒序排列了
@@ -59,12 +59,12 @@ func (c *Cache)AddSubmits(mes SmsMes) {
 	c.conn.Do("LTRIM", "submitlist", "0", "49")
 }
 
-func (c *Cache)GetSubmits() []SmsMes {
+func (c *Cache)GetSubmits() *[]SmsMes {
 	values, err := redis.Strings(c.conn.Do("LRANGE", "submitlist", 0, -1))
 	if err != nil {
 		fmt.Println(err)
-		//返回空对象
-		return make([]SmsMes, 0, 0)
+		nullList := make([]SmsMes,0,0)
+		return &nullList
 	}
 	v := make([]SmsMes, 0, len(values))
 	for _, s := range values {
@@ -72,10 +72,10 @@ func (c *Cache)GetSubmits() []SmsMes {
 		json.Unmarshal([]byte(s), &mes)
 		v = append(v, mes)
 	}
-	return v
+	return &v
 }
 
-func (c *Cache)AddMoList(mes SmsMes) {
+func (c *Cache)AddMoList(mes *SmsMes) {
 	//将submit结果提交到redis的队列存放
 	data, _ := json.Marshal(mes)
 	//新的记录加在头部,自然就倒序排列了
@@ -84,12 +84,13 @@ func (c *Cache)AddMoList(mes SmsMes) {
 	c.conn.Do("LTRIM", "molist", "0", "49")
 }
 
-func (c *Cache)GetMoList() []SmsMes {
+func (c *Cache)GetMoList() *[]SmsMes {
 	values, err := redis.Strings(c.conn.Do("LRANGE", "molist", 0, -1))
 	if err != nil {
 		fmt.Println(err)
 		//返回空对象
-		return make([]SmsMes, 0, 0)
+		nullList := make([]SmsMes,0,0)
+		return &nullList
 	}
 	v := make([]SmsMes, 0, len(values))
 	for _, s := range values {
@@ -97,5 +98,5 @@ func (c *Cache)GetMoList() []SmsMes {
 		json.Unmarshal([]byte(s), &mes)
 		v = append(v, mes)
 	}
-	return v
+	return &v
 }
