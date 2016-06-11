@@ -54,53 +54,30 @@ func (c *Cache)AddSubmits(mes *SmsMes) {
 	//将submit结果提交到redis的队列存放
 	data, _ := json.Marshal(mes)
 	//新的记录加在头部,自然就倒序排列了
-	c.conn.Do("LPUSH", "submitlist", data)
+	c.conn.Do("LPUSH", "list_message", data)
 	//只保留最近五十条
-	c.conn.Do("LTRIM", "submitlist", "0", "49")
-}
-
-func (c *Cache)GetSubmits(start, end int) *[]SmsMes {
-	values, err := redis.Strings(c.conn.Do("LRANGE", "submitlist", start, end))
-	if err != nil {
-		fmt.Println(err)
-		return &[]SmsMes{}
-	}
-	v := make([]SmsMes, 0, len(values))
-	for _, s := range values {
-		mes := SmsMes{}
-		json.Unmarshal([]byte(s), &mes)
-		v = append(v, mes)
-	}
-	return &v
-}
-
-func (c *Cache)LengthOfSubmits() int{
-	return c.length("submitlist")
+	//c.conn.Do("LTRIM", "submitlist", "0", "49")
 }
 
 func (c *Cache)AddMoList(mes *SmsMes) {
 	//将submit结果提交到redis的队列存放
 	data, _ := json.Marshal(mes)
 	//新的记录加在头部,自然就倒序排列了
-	c.conn.Do("LPUSH", "molist", data)
+	c.conn.Do("LPUSH", "list_mo", data)
 	//只保留最近五十条
-	c.conn.Do("LTRIM", "molist", "0", "49")
+	//c.conn.Do("LTRIM", "molist", "0", "49")
 }
 
-func (c *Cache)length(listName string) int {
+func (c *Cache)Length(listName string) int {
 	if listName == "" {
 		return 0
 	}
-	size,_ := redis.Int(c.conn.Do("LLEN", listName))
+	size, _ := redis.Int(c.conn.Do("LLEN", listName))
 	return size
 }
 
-func (c *Cache)LengthOfMoList() int {
-	return c.length("molist")
-}
-
-func (c *Cache)GetMoList(start int, end int) *[]SmsMes {
-	values, err := redis.Strings(c.conn.Do("LRANGE", "molist", start, end))
+func (c *Cache)GetList(listName string, start, end int) *[]SmsMes {
+	values, err := redis.Strings(c.conn.Do("LRANGE", listName, start, end))
 	if err != nil {
 		fmt.Println(err)
 		//返回空对象

@@ -10,7 +10,7 @@ import (
 	"github.com/JoeCao/cmpp-gateway/pages"
 )
 
-var pageSize = 10
+var pageSize = 5
 // handler echoes the HTTP request.
 func handler(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
@@ -51,7 +51,8 @@ func findTemplate(w http.ResponseWriter, r *http.Request, tpl string) {
 		return
 	}
 }
-func listMessage(w http.ResponseWriter, r *http.Request) {
+
+func listMessage(w http.ResponseWriter, r *http.Request, listName string) {
 	r.ParseForm()
 	parameter := r.Form.Get("page")
 	var c_page int
@@ -60,14 +61,14 @@ func listMessage(w http.ResponseWriter, r *http.Request) {
 	} else {
 		c_page, _ = strconv.Atoi(parameter)
 	}
-	count := SCache.LengthOfMoList()
+	count := SCache.Length(listName)
 	page := pages.NewPage(c_page, pageSize, count)
-	t, err := template.New("list_message.html").ParseFiles("list_message.html")
+	t, err := template.New(listName+".html").ParseFiles(listName+".html")
 	if err != nil {
 		fmt.Fprintf(w, "template error %v", err)
 		return
 	}
-	v := SCache.GetSubmits(page.StartRow, page.EndRow)
+	v := SCache.GetList(listName, page.StartRow, page.EndRow)
 	ret := map[string]interface{}{
 		"data":     v,
 		"page":     page,
@@ -79,39 +80,18 @@ func listMessage(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func listMo(w http.ResponseWriter, r *http.Request) {
-	r.ParseForm()
-	parameter := r.Form.Get("page")
-	var c_page int
-	if parameter == "" {
-		c_page = 1
-	} else {
-		c_page, _ = strconv.Atoi(parameter)
-	}
-	count := SCache.LengthOfMoList()
-	page := pages.NewPage(c_page, pageSize, count)
-	t, err := template.New("list_mo.html").ParseFiles("list_mo.html")
-	if err != nil {
-		fmt.Fprintf(w, "template error %v", err)
-		return
-	}
-	v := SCache.GetMoList(page.StartRow, page.EndRow)
-	ret := map[string]interface{}{
-		"data":     v,
-		"page":     page,
-	}
+func listSubmits(w http.ResponseWriter, r *http.Request) {
+	listMessage(w, r, "list_message")
+}
 
-	err = t.Execute(w, ret)
-	if err != nil {
-		fmt.Fprintf(w, "error %v", err)
-		return
-	}
+func listMo(w http.ResponseWriter, r *http.Request) {
+	listMessage(w, r, "list_mo")
 }
 
 func Serve(config *Config) {
 	http.HandleFunc("/send", handler)
 	http.HandleFunc("/", index)
-	http.HandleFunc("/list_message", listMessage)
+	http.HandleFunc("/list_message", listSubmits)
 	http.HandleFunc("/list_mo", listMo)
 	log.Fatal(http.ListenAndServe(config.HttpHost + ":" + config.HttpPort, nil))
 }
