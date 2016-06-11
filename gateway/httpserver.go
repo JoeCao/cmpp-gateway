@@ -6,8 +6,11 @@ import (
 	"html/template"
 	"log"
 	"net/http"
+	"strconv"
+	"math"
 )
 
+var pageSize = 5
 // handler echoes the HTTP request.
 func handler(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
@@ -64,18 +67,54 @@ func listMessage(w http.ResponseWriter, r *http.Request) {
 }
 
 func listMo(w http.ResponseWriter, r *http.Request) {
+	r.ParseForm()
+	parameter := r.Form.Get("page")
+	var page int
+	if parameter == "" {
+		page = 1
+	} else {
+		page, _ = strconv.Atoi(parameter)
+	}
+	count := SCache.LengthOfMoList()
+	lastPage, nextPage, totalPage, startRow, endRow := calPages(page, count)
 	t, err := template.New("list_mo.html").ParseFiles("list_mo.html")
 	if err != nil {
 		fmt.Fprintf(w, "template error %v", err)
 		return
 	}
-	v := SCache.GetMoList()
+	v := SCache.GetMoList(startRow, endRow)
+	ret := map[string]interface{}{
+		"data":     v,
+		"lastpage": lastPage,
+		"nextpage": nextPage,
+		"page":     page,
+		"totalpage": totalPage,
+	}
 
-	err = t.Execute(w, v)
+	err = t.Execute(w, ret)
 	if err != nil {
 		fmt.Fprintf(w, "error %v", err)
 		return
 	}
+}
+
+func calPages(page int, length int) (int, int, int, int, int) {
+	d := float64(length) / float64(pageSize)
+	totalPage := int(math.Ceil(d))
+	var lastPage, nextPage, startRow, endRow int
+	if page == 1 {
+		lastPage = 1
+	} else {
+		lastPage = page - 1
+	}
+	startRow = page * pageSize - pageSize
+	if page >= totalPage {
+		nextPage = totalPage
+	} else {
+		nextPage = page + 1
+	}
+	endRow = page * pageSize - 1
+	return lastPage, nextPage, totalPage, startRow, endRow
 }
 
 func Serve(config *Config) {

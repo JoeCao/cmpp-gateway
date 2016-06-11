@@ -83,8 +83,20 @@ func (c *Cache)AddMoList(mes *SmsMes) {
 	c.conn.Do("LTRIM", "molist", "0", "49")
 }
 
-func (c *Cache)GetMoList() *[]SmsMes {
-	values, err := redis.Strings(c.conn.Do("LRANGE", "molist", 0, -1))
+func (c *Cache)length(listName string) int {
+	if listName == "" {
+		return 0
+	}
+	size,_ := redis.Int(c.conn.Do("LLEN", listName))
+	return size
+}
+
+func (c *Cache)LengthOfMoList() int {
+	return c.length("molist")
+}
+
+func (c *Cache)GetMoList(start int, end int) *[]SmsMes {
+	values, err := redis.Strings(c.conn.Do("LRANGE", "molist", start, end))
 	if err != nil {
 		fmt.Println(err)
 		//返回空对象

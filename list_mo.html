@@ -43,7 +43,7 @@
 </nav>
 <div class="container">
     <h2>历史记录</h2>
-    <p>保留最近的五十条记录</p>
+    <p>当前第{{.page}}页, 一共{{.totalpage}}页<p>
     <table class="table">
         <thead>
         <tr>
@@ -56,7 +56,7 @@
         </thead>
         <tbody>
 
-        {{range .}}
+        {{range .data}}
         <tr>
             <td>{{.Src}}</td>
             <td>{{.Dest}}</td>
@@ -68,6 +68,10 @@
 
         </tbody>
     </table>
+    <ul class="pager">
+        <li class="previous"><a href="list_mo?page={{.lastpage}}">&larr; 上一页</a></li>
+        <li class="next"><a href="list_mo?page={{.nextpage}}">下一页 &rarr;</a></li>
+    </ul>
 </div>
 <!-- jQuery文件。务必在bootstrap.min.js 之前引入 -->
 <script src="//cdn.bootcss.com/jquery/1.11.3/jquery.min.js"></script>
