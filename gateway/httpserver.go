@@ -52,14 +52,30 @@ func findTemplate(w http.ResponseWriter, r *http.Request, tpl string) {
 	}
 }
 func listMessage(w http.ResponseWriter, r *http.Request) {
+	r.ParseForm()
+	parameter := r.Form.Get("page")
+	var page int
+	if parameter == "" {
+		page = 1
+	} else {
+		page, _ = strconv.Atoi(parameter)
+	}
+	count := SCache.LengthOfMoList()
+	lastPage, nextPage, totalPage, startRow, endRow := calPages(page, count)
 	t, err := template.New("list_message.html").ParseFiles("list_message.html")
 	if err != nil {
 		fmt.Fprintf(w, "template error %v", err)
 		return
 	}
-	v := SCache.GetSubmits()
-
-	err = t.Execute(w, v)
+	v := SCache.GetSubmits(startRow, endRow)
+	ret := map[string]interface{}{
+		"data":     v,
+		"lastpage": lastPage,
+		"nextpage": nextPage,
+		"page":     page,
+		"totalpage": totalPage,
+	}
+	err = t.Execute(w, ret)
 	if err != nil {
 		fmt.Fprintf(w, "error %v", err)
 		return

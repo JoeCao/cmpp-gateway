@@ -59,8 +59,8 @@ func (c *Cache)AddSubmits(mes *SmsMes) {
 	c.conn.Do("LTRIM", "submitlist", "0", "49")
 }
 
-func (c *Cache)GetSubmits() *[]SmsMes {
-	values, err := redis.Strings(c.conn.Do("LRANGE", "submitlist", 0, -1))
+func (c *Cache)GetSubmits(start, end int) *[]SmsMes {
+	values, err := redis.Strings(c.conn.Do("LRANGE", "submitlist", start, end))
 	if err != nil {
 		fmt.Println(err)
 		return &[]SmsMes{}
@@ -72,6 +72,10 @@ func (c *Cache)GetSubmits() *[]SmsMes {
 		v = append(v, mes)
 	}
 	return &v
+}
+
+func (c *Cache)LengthOfSubmits() int{
+	return c.length("submitlist")
 }
 
 func (c *Cache)AddMoList(mes *SmsMes) {
