@@ -43,7 +43,7 @@
 </nav>
 <div class="container">
     <h2>历史记录</h2>
-    <p>当前第{{.page}}页, 一共{{.totalpage}}页
+    <p>当前第{{.page.CurrentPage}}页, 一共{{.page.TotalPage}}页
     <p>
     <table class="table">
         <thead>
@@ -70,8 +70,14 @@
         </tbody>
     </table>
     <ul class="pager">
-        <li class="previous"><a href="list_message?page={{.lastpage}}">&larr; 上一页</a></li>
-        <li class="next"><a href="list_message?page={{.nextpage}}">下一页 &rarr;</a></li>
+        {{if .page.IsFirst}}
+        {{else}}
+        <li class="previous"><a href="list_message?page={{.page.LastPage}}">&larr; 上一页</a></li>
+        {{end}}
+        {{if .page.IsEnd}}
+        {{else}}
+        <li class="next"><a href="list_message?page={{.page.NextPage}}">下一页 &rarr;</a></li>
+        {{end}}
     </ul>
 </div>
 <!-- jQuery文件。务必在bootstrap.min.js 之前引入 -->
