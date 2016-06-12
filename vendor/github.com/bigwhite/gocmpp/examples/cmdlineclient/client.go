@@ -8,14 +8,14 @@ import (
 	"log"
 	"os"
 	//"sync"
-	"time"
 	"github.com/streamrail/concurrent-map"
 	"strconv"
+	"time"
 )
 
 const (
-	user string = "900001"
-	password string = "888888"
+	user           string        = "900001"
+	password       string        = "888888"
 	connectTimeout time.Duration = time.Second * 2
 )
 
@@ -50,7 +50,7 @@ func startAClient(idx int) {
 			switch p := i.(type) {
 			case *cmpp.Cmpp3SubmitRspPkt:
 				log.Printf("client %d: receive a cmpp3 submit response: %v.", idx, p)
-				if content, ok := submit_cache.Get(strconv.FormatUint(uint64(p.SeqId), 10)); ok{
+				if content, ok := submit_cache.Get(strconv.FormatUint(uint64(p.SeqId), 10)); ok {
 					log.Printf("短信内容: %s, 发送状态 %d", content, p.Result)
 				}
 			case *cmpp.CmppActiveTestReqPkt:
@@ -83,7 +83,7 @@ func startAClient(idx int) {
 
 		select {
 		case context := <-messages:
-		//submit a message
+			//submit a message
 			cont, err := cmpputils.Utf8ToUcs2(context)
 			if err != nil {
 				fmt.Printf("client %d: utf8 to ucs2 transform err: %s.", idx, err)
@@ -124,10 +124,9 @@ func startAClient(idx int) {
 		}
 	}
 
-
 }
 
-func isRunning() bool{
+func isRunning() bool {
 	select {
 	case <-cancel:
 		return false

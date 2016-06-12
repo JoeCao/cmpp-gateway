@@ -19,9 +19,9 @@ type Config struct {
 	HttpHost string `json:"http_host"`
 	HttpPort string `json:"http_port"`
 
-	CMPPHost string `json:"cmpp_host"`
-	CMPPPort string `json:"cmpp_port"`
-	Debug    bool   `json:"debug"`
+	CMPPHost  string `json:"cmpp_host"`
+	CMPPPort  string `json:"cmpp_port"`
+	Debug     bool   `json:"debug"`
 	RedisHost string `json:"redis_host"`
 	RedisPort string `json:"redis_port"`
 }

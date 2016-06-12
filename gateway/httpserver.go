@@ -3,14 +3,15 @@ package gateway
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/JoeCao/cmpp-gateway/pages"
 	"html/template"
 	"log"
 	"net/http"
 	"strconv"
-	"github.com/JoeCao/cmpp-gateway/pages"
 )
 
 var pageSize = 5
+
 // handler echoes the HTTP request.
 func handler(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
@@ -63,15 +64,15 @@ func listMessage(w http.ResponseWriter, r *http.Request, listName string) {
 	}
 	count := SCache.Length(listName)
 	page := pages.NewPage(c_page, pageSize, count)
-	t, err := template.New(listName+".html").ParseFiles(listName+".html")
+	t, err := template.New(listName + ".html").ParseFiles(listName + ".html")
 	if err != nil {
 		fmt.Fprintf(w, "template error %v", err)
 		return
 	}
 	v := SCache.GetList(listName, page.StartRow, page.EndRow)
 	ret := map[string]interface{}{
-		"data":     v,
-		"page":     page,
+		"data": v,
+		"page": page,
 	}
 	err = t.Execute(w, ret)
 	if err != nil {
@@ -93,5 +94,5 @@ func Serve(config *Config) {
 	http.HandleFunc("/", index)
 	http.HandleFunc("/list_message", listSubmits)
 	http.HandleFunc("/list_mo", listMo)
-	log.Fatal(http.ListenAndServe(config.HttpHost + ":" + config.HttpPort, nil))
+	log.Fatal(http.ListenAndServe(config.HttpHost+":"+config.HttpPort, nil))
 }

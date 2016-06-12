@@ -30,7 +30,7 @@ func (p *Page) calPages(length int) {
 		p.LastPage = p.CurrentPage - 1
 		p.IsFirst = false
 	}
-	p.StartRow = p.CurrentPage * p.PageSize - p.PageSize
+	p.StartRow = p.CurrentPage*p.PageSize - p.PageSize
 	if p.CurrentPage >= p.TotalPage {
 		p.NextPage = p.TotalPage
 		p.IsEnd = true

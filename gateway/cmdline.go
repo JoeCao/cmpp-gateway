@@ -1,8 +1,8 @@
 package gateway
 
 import (
-	"log"
 	"bufio"
+	"log"
 	"os"
 )
 

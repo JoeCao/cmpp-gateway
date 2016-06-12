@@ -1,12 +1,12 @@
 package main
 
 import (
-	"github.com/JoeCao/cmpp-gateway/gateway"
-	"flag"
-	"log"
 	"encoding/json"
-	"os"
+	"flag"
+	"github.com/JoeCao/cmpp-gateway/gateway"
 	"io/ioutil"
+	"log"
+	"os"
 )
 
 func main() {
@@ -34,7 +34,7 @@ func main() {
 	defer gateway.StopCache()
 	go gateway.Serve(config)
 
-	<- gateway.Abort
+	<-gateway.Abort
 }
 
 func LoadJsonFile(filePath string, obj interface{}) error {

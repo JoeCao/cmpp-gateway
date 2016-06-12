@@ -17,8 +17,6 @@ var Messages = make(chan SmsMes, 10)
 //退出消息队列
 var Abort = make(chan struct{})
 
-
-
 //配置文件
 var config *Config
 
@@ -27,7 +25,7 @@ var c *cmpp.Client
 
 func connectServer() {
 	c = cmpp.NewClient(cmpp.V30)
-	err := c.Connect(config.CMPPHost + ":" + config.CMPPPort, config.User, config.Password, connectTimeout)
+	err := c.Connect(config.CMPPHost+":"+config.CMPPPort, config.User, config.Password, connectTimeout)
 	if err != nil {
 		log.Printf("client connect error: %s.", err)
 		return
@@ -37,7 +35,7 @@ func connectServer() {
 
 func activeTimer() {
 	ticker := time.NewTicker(time.Second * 10)
-	OuterLoop:
+OuterLoop:
 	for {
 		select {
 		case <-ticker.C:
@@ -128,7 +126,7 @@ func startReceiver() {
 }
 
 func startSender() {
-	OuterLoop:
+OuterLoop:
 	for {
 		select {
 		case message := <-Messages:
@@ -157,7 +155,7 @@ func startSender() {
 			}
 
 			seq_id, err := c.SendReqPktWithSeqId(p)
-		//赋值default value
+			//赋值default value
 			message.Created = time.Now()
 			message.DelivleryResult = 65535
 			message.SubmitResult = 65535

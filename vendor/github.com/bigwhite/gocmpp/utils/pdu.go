@@ -1,6 +1,5 @@
 package cmpputils
 
-
 import (
 	"bytes"
 	"errors"
