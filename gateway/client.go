@@ -1,9 +1,7 @@
 package gateway
 
 import (
-	"fmt"
 	"github.com/bigwhite/gocmpp"
-	"github.com/bigwhite/gocmpp/utils"
 	"log"
 	"strconv"
 	"time"
@@ -135,21 +133,16 @@ func startSender() {
 		select {
 		case message := <-Messages:
 			log.Printf("mes %v", message)
-			cont, err := cmpputils.Utf8ToUcs2(message.Content)
-			if err != nil {
-				fmt.Printf("client : utf8 to ucs2 transform err: %s.", err)
-				return
-			}
 			p := &cmpp.Cmpp3SubmitReqPkt{
 				PkTotal:            1,
 				PkNumber:           1,
-				RegisteredDelivery: 1,
+				RegisteredDelivery: 0,
 				MsgLevel:           1,
 				ServiceId:          config.ServiceId,
 				FeeUserType:        0,
 				FeeTerminalId:      "",
 				FeeTerminalType:    0,
-				MsgFmt:             8,
+				MsgFmt:             0,
 				MsgSrc:             message.Src,
 				FeeType:            "01",
 				FeeCode:            "000000",
@@ -159,8 +152,8 @@ func startSender() {
 				DestUsrTl:          1,
 				DestTerminalId:     []string{message.Dest},
 				DestTerminalType:   0,
-				MsgLength:          uint8(len(cont)),
-				MsgContent:         cont,
+				MsgLength:          uint8(len(message.Content)),
+				MsgContent:         message.Content,
 			}
 
 			seq_id, err := c.SendReqPktWithSeqId(p)
