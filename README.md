@@ -95,3 +95,7 @@ Submit/Submit Resp 为异步传输，发送时填写了序列号"SEQID"，但是
 所以在submit后，我们将SEQID保存到KV存储中，然后在返回的消息中通过SEQID查找对应的消息。
 
 同理Submit Response和Delivery Report之间通过MSGID关联，也需要保存对应的KV。不过本次因为对Delivery Report没有特殊保存要求，所以就不实现了。
+
+##感谢
+感谢 @bigwhite 提供了坚实可靠的CMPP协议基础
+https://github.com/bigwhite/gocmpp.git
