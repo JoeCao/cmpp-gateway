@@ -16,6 +16,7 @@ go.work
 
 # Compiled binary
 cmpp-gateway
+simulator/cmpp-simulator
 
 # Dependency directories (uncomment if not using vendor for version locking)
 # vendor/
