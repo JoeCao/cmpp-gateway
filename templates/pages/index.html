@@ -1,0 +1,245 @@
+{{define "index_content"}}
+<div class="row">
+    <div class="col-12">
+        <h1 class="mb-4">
+            <i class="bi bi-grid-3x3-gap"></i> 控制面板
+        </h1>
+    </div>
+</div>
+
+<!-- Statistics Cards -->
+<div class="row g-4 mb-4">
+    <div class="col-md-3">
+        <div class="card stat-card border-start border-primary border-4">
+            <div class="stat-icon text-primary">
+                <i class="bi bi-send-check"></i>
+            </div>
+            <div class="stat-value text-primary" id="stat-submitted">{{.Stats.TotalSubmitted}}</div>
+            <div class="stat-label">下发总数</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card border-start border-success border-4">
+            <div class="stat-icon text-success">
+                <i class="bi bi-check-circle"></i>
+            </div>
+            <div class="stat-value text-success" id="stat-success">{{.Stats.TotalSuccess}}</div>
+            <div class="stat-label">成功数量</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card border-start border-danger border-4">
+            <div class="stat-icon text-danger">
+                <i class="bi bi-x-circle"></i>
+            </div>
+            <div class="stat-value text-danger" id="stat-failed">{{.Stats.TotalFailed}}</div>
+            <div class="stat-label">失败数量</div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card border-start border-info border-4">
+            <div class="stat-icon text-info">
+                <i class="bi bi-inbox"></i>
+            </div>
+            <div class="stat-value text-info" id="stat-received">{{.Stats.TotalReceived}}</div>
+            <div class="stat-label">上行总数</div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- SMS Send Form -->
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-send"></i> 发送短信
+            </div>
+            <div class="card-body">
+                <form id="sms-form">
+                    <div class="mb-3">
+                        <label for="src" class="form-label">源号码</label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="src" id="src1" value="{{.DefaultSrc}}" checked>
+                            <label class="form-check-label" for="src1">
+                                {{.DefaultSrc}}
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="dest" class="form-label">
+                            <i class="bi bi-phone"></i> 接收号码
+                        </label>
+                        <input type="tel" class="form-control" id="dest" name="dest"
+                               placeholder="例如: 13800138000" required pattern="[0-9]{11}">
+                        <div class="form-text">请输入11位手机号码</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="cont" class="form-label">
+                            <i class="bi bi-chat-left-text"></i> 短信内容
+                        </label>
+                        <textarea class="form-control" id="cont" name="cont" rows="4"
+                                  placeholder="请输入短信内容..." maxlength="500" required></textarea>
+                        <div class="form-text">
+                            <span id="char-count">0</span> / 500 字符
+                        </div>
+                    </div>
+
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="bi bi-send"></i> 发送短信
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Connection Info & Quick Links -->
+    <div class="col-lg-6">
+        <!-- Connection Status -->
+        <div class="card mb-3">
+            <div class="card-header">
+                <i class="bi bi-diagram-3"></i> 连接状态
+            </div>
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-auto">
+                        <div class="status-indicator status-online" style="width: 40px; height: 40px;"></div>
+                    </div>
+                    <div class="col">
+                        <h5 class="mb-1">CMPP 服务器</h5>
+                        <p class="text-muted mb-0">{{.Config.CMPPHost}}:{{.Config.CMPPPort}}</p>
+                    </div>
+                    <div class="col-auto">
+                        <span class="badge bg-success fs-6">在线</span>
+                    </div>
+                </div>
+                <hr>
+                <div class="row align-items-center">
+                    <div class="col-auto">
+                        <i class="bi bi-database text-danger" style="font-size: 2rem;"></i>
+                    </div>
+                    <div class="col">
+                        <h5 class="mb-1">Redis 缓存</h5>
+                        <p class="text-muted mb-0">{{.Config.RedisHost}}:{{.Config.RedisPort}}</p>
+                    </div>
+                    <div class="col-auto">
+                        <span class="badge bg-success fs-6">在线</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="card">
+            <div class="card-header">
+                <i class="bi bi-lightning"></i> 快捷操作
+            </div>
+            <div class="card-body">
+                <div class="list-group list-group-flush">
+                    <a href="/list_message" class="list-group-item list-group-item-action">
+                        <div class="d-flex w-100 justify-content-between align-items-center">
+                            <div>
+                                <i class="bi bi-list-check text-primary"></i>
+                                <strong class="ms-2">查看下发记录</strong>
+                            </div>
+                            <i class="bi bi-chevron-right"></i>
+                        </div>
+                    </a>
+                    <a href="/list_mo" class="list-group-item list-group-item-action">
+                        <div class="d-flex w-100 justify-content-between align-items-center">
+                            <div>
+                                <i class="bi bi-inbox text-info"></i>
+                                <strong class="ms-2">查看上行记录</strong>
+                            </div>
+                            <i class="bi bi-chevron-right"></i>
+                        </div>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{{end}}
+
+{{define "index_scripts"}}
+<script>
+    // Character counter
+    const contInput = document.getElementById('cont');
+    const charCount = document.getElementById('char-count');
+
+    contInput.addEventListener('input', function() {
+        charCount.textContent = this.value.length;
+    });
+
+    // Form submission
+    const smsForm = document.getElementById('sms-form');
+    smsForm.addEventListener('submit', async function(e) {
+        e.preventDefault();
+
+        const formData = new FormData(this);
+        const submitBtn = this.querySelector('button[type="submit"]');
+        const originalText = submitBtn.innerHTML;
+
+        // Disable button and show loading
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>发送中...';
+
+        try {
+            const response = await fetch('/send', {
+                method: 'POST',
+                body: new URLSearchParams(formData)
+            });
+
+            const data = await response.json();
+
+            if (data.result === 0) {
+                showAlert('success', '发送成功', '短信已成功提交到发送队列');
+                smsForm.reset();
+                charCount.textContent = '0';
+                updateStats();
+            } else {
+                showAlert('danger', '发送失败', data.error || '未知错误');
+            }
+        } catch (error) {
+            showAlert('danger', '发送失败', '网络错误: ' + error.message);
+        } finally {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalText;
+        }
+    });
+
+    function showAlert(type, title, message) {
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `alert alert-${type} alert-dismissible fade show position-fixed top-0 start-50 translate-middle-x mt-3`;
+        alertDiv.style.zIndex = '9999';
+        alertDiv.style.minWidth = '300px';
+        alertDiv.innerHTML = `
+            <strong>${title}</strong><br>${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        `;
+        document.body.appendChild(alertDiv);
+
+        setTimeout(() => {
+            alertDiv.remove();
+        }, 5000);
+    }
+
+    function updateStats() {
+        // Increment submitted count
+        const statSubmitted = document.getElementById('stat-submitted');
+        if (statSubmitted) {
+            const current = parseInt(statSubmitted.textContent) || 0;
+            statSubmitted.textContent = current + 1;
+        }
+    }
+
+    // Auto-refresh stats every 30 seconds
+    setInterval(() => {
+        // In a real implementation, fetch stats from server
+        // For now, just a placeholder
+    }, 30000);
+</script>
+{{end}}

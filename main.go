@@ -27,11 +27,11 @@ func main() {
 	} else {
 		log.Fatal("加载失败 ", configPath, " => ", err)
 	}
-	go gateway.StartClient(config)
-	go gateway.StartCmdLine()
-
-	go gateway.StartCache(config)
+	gateway.StartCache(config)
 	defer gateway.StopCache()
+
+	go gateway.StartClient(config)
+	// go gateway.StartCmdLine() // 临时禁用命令行功能以避免空输入循环
 	go gateway.Serve(config)
 
 	<-gateway.Abort

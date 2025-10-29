@@ -7,6 +7,7 @@ type Page struct {
 	LastPage    int
 	NextPage    int
 	TotalPage   int
+	TotalRecord int
 	StartRow    int
 	EndRow      int
 	IsEnd       bool
@@ -15,7 +16,7 @@ type Page struct {
 }
 
 func NewPage(current, size, length int) Page {
-	page := Page{CurrentPage: current, PageSize: size}
+	page := Page{CurrentPage: current, PageSize: size, TotalRecord: length}
 	page.calPages(length)
 	return page
 }

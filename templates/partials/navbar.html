@@ -1,0 +1,42 @@
+{{define "navbar"}}
+<nav class="navbar navbar-expand-lg navbar-dark bg-primary sticky-top">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="/">
+            <i class="bi bi-broadcast"></i> CMPP Gateway
+        </a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
+                aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav me-auto">
+                <li class="nav-item">
+                    <a class="nav-link {{if eq .ActivePage "home"}}active{{end}}" href="/">
+                        <i class="bi bi-house-door"></i> 首页
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {{if eq .ActivePage "submit"}}active{{end}}" href="/">
+                        <i class="bi bi-send"></i> 发送短信
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {{if eq .ActivePage "list_message"}}active{{end}}" href="/list_message">
+                        <i class="bi bi-list-check"></i> 下发记录
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {{if eq .ActivePage "list_mo"}}active{{end}}" href="/list_mo">
+                        <i class="bi bi-inbox"></i> 上行记录
+                    </a>
+                </li>
+            </ul>
+            <div class="d-flex align-items-center text-white">
+                <span class="status-indicator status-online"></span>
+                <span class="me-2">连接状态</span>
+                <span class="badge bg-success" id="connection-status">已连接</span>
+            </div>
+        </div>
+    </div>
+</nav>
+{{end}}

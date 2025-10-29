@@ -12,13 +12,21 @@ func StartCmdLine() {
 	for isRunning() {
 		data, _, _ := reader.ReadLine()
 		command := string(data)
-		mes := SmsMes{Content: command, Src: "104221", Dest: "13900001111"}
 
-		Messages <- mes
+		// 只有输入不为空且不是 "stop" 时才发送短信
+		if command != "" && command != "stop" {
+			mes := SmsMes{Content: command, Src: "104221", Dest: "13900001111"}
+			Messages <- mes
+			log.Println("发送短信:", command)
+		}
+
 		if command == "stop" {
 			close(Abort)
 			break
 		}
-		log.Println("command", command)
+
+		if command == "" {
+			log.Println("空输入，跳过发送")
+		}
 	}
 }

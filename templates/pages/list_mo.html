@@ -1,0 +1,251 @@
+{{define "list_mo_content"}}
+<div class="row">
+    <div class="col-12">
+        <h1 class="mb-4">
+            <i class="bi bi-inbox"></i> 上行短信记录
+        </h1>
+    </div>
+</div>
+
+<!-- Filter Card -->
+<div class="card mb-4">
+    <div class="card-body">
+        <form class="row g-3" id="filter-form">
+            <div class="col-md-3">
+                <label for="filter-src" class="form-label">发送号码</label>
+                <input type="text" class="form-control" id="filter-src" placeholder="手机号码">
+            </div>
+            <div class="col-md-3">
+                <label for="filter-dest" class="form-label">接收号码</label>
+                <input type="text" class="form-control" id="filter-dest" placeholder="服务号码">
+            </div>
+            <div class="col-md-4">
+                <label for="filter-content" class="form-label">内容关键词</label>
+                <input type="text" class="form-control" id="filter-content" placeholder="搜索内容">
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                <button type="submit" class="btn btn-primary w-100">
+                    <i class="bi bi-search"></i> 搜索
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Statistics Summary -->
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="card bg-info text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="mb-0">总记录数</h6>
+                        <h3 class="mb-0 mt-2">{{.Page.TotalRecord}}</h3>
+                    </div>
+                    <i class="bi bi-file-earmark-text" style="font-size: 2.5rem; opacity: 0.5;"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card bg-primary text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="mb-0">当前页</h6>
+                        <h3 class="mb-0 mt-2">第 {{.Page.CurrentPage}} 页</h3>
+                    </div>
+                    <i class="bi bi-folder" style="font-size: 2.5rem; opacity: 0.5;"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card bg-success text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h6 class="mb-0">总页数</h6>
+                        <h3 class="mb-0 mt-2">{{.Page.TotalPage}} 页</h3>
+                    </div>
+                    <i class="bi bi-layers" style="font-size: 2.5rem; opacity: 0.5;"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Messages Table -->
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-table"></i> 消息列表</span>
+        <button class="btn btn-sm btn-outline-primary" onclick="location.reload()">
+            <i class="bi bi-arrow-clockwise"></i> 刷新
+        </button>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th style="width: 8%;">序号</th>
+                        <th style="width: 15%;">发送号码</th>
+                        <th style="width: 15%;">接收号码</th>
+                        <th style="width: 32%;">短信内容</th>
+                        <th style="width: 15%;">接收时间</th>
+                        <th style="width: 15%;">消息ID</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {{if .Data}}
+                        {{range $index, $item := .Data}}
+                        <tr>
+                            <td>{{add (mul (sub $.Page.CurrentPage 1) $.Page.PageSize) (add $index 1)}}</td>
+                            <td>
+                                <i class="bi bi-phone-fill text-success"></i>
+                                <strong>{{$item.Src}}</strong>
+                            </td>
+                            <td>
+                                <i class="bi bi-broadcast text-primary"></i>
+                                {{$item.Dest}}
+                            </td>
+                            <td>
+                                <div class="text-truncate" style="max-width: 350px;" title="{{$item.Content}}">
+                                    <i class="bi bi-chat-left-text text-muted"></i>
+                                    {{$item.Content}}
+                                </div>
+                            </td>
+                            <td>
+                                <small class="text-muted">
+                                    <i class="bi bi-clock"></i> {{$item.Created}}
+                                </small>
+                            </td>
+                            <td>
+                                <code class="small">{{$item.MsgId}}</code>
+                            </td>
+                        </tr>
+                        {{end}}
+                    {{else}}
+                        <tr>
+                            <td colspan="6" class="text-center py-5">
+                                <i class="bi bi-inbox" style="font-size: 3rem; color: #ccc;"></i>
+                                <p class="text-muted mt-2">暂无上行消息</p>
+                            </td>
+                        </tr>
+                    {{end}}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Pagination -->
+    {{if .Data}}
+    <div class="card-footer bg-white">
+        <nav>
+            <ul class="pagination justify-content-center mb-0">
+                {{if .Page.IsFirst}}
+                    <li class="page-item disabled">
+                        <span class="page-link">
+                            <i class="bi bi-chevron-left"></i> 上一页
+                        </span>
+                    </li>
+                {{else}}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{.Page.LastPage}}">
+                            <i class="bi bi-chevron-left"></i> 上一页
+                        </a>
+                    </li>
+                {{end}}
+
+                <!-- Page numbers -->
+                {{range $i := pageRange .Page.CurrentPage .Page.TotalPage}}
+                    <li class="page-item {{if eq $i $.Page.CurrentPage}}active{{end}}">
+                        <a class="page-link" href="?page={{$i}}">{{$i}}</a>
+                    </li>
+                {{end}}
+
+                {{if .Page.IsEnd}}
+                    <li class="page-item disabled">
+                        <span class="page-link">
+                            下一页 <i class="bi bi-chevron-right"></i>
+                        </span>
+                    </li>
+                {{else}}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{.Page.NextPage}}">
+                            下一页 <i class="bi bi-chevron-right"></i>
+                        </a>
+                    </li>
+                {{end}}
+            </ul>
+        </nav>
+        <div class="text-center mt-2">
+            <small class="text-muted">
+                显示第 {{.Page.StartRow}} - {{.Page.EndRow}} 条记录，共 {{.Page.TotalRecord}} 条
+            </small>
+        </div>
+    </div>
+    {{end}}
+</div>
+
+<!-- Message Detail Modal -->
+<div class="modal fade" id="messageDetailModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-info-circle"></i> 消息详情
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="messageDetailContent">
+                <!-- Content will be injected by JavaScript -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+            </div>
+        </div>
+    </div>
+</div>
+{{end}}
+
+{{define "list_mo_scripts"}}
+<script>
+    // Filter form submission
+    document.getElementById('filter-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        // In a real implementation, this would filter the results
+        alert('过滤功能需要后端API支持，当前为演示版本');
+    });
+
+    // Show message detail (for future enhancement)
+    function showDetail(src, dest, content, msgId, created) {
+        const modal = new bootstrap.Modal(document.getElementById('messageDetailModal'));
+        document.getElementById('messageDetailContent').innerHTML = `
+            <dl class="row">
+                <dt class="col-sm-3">发送号码</dt>
+                <dd class="col-sm-9">${src}</dd>
+                <dt class="col-sm-3">接收号码</dt>
+                <dd class="col-sm-9">${dest}</dd>
+                <dt class="col-sm-3">消息内容</dt>
+                <dd class="col-sm-9">${content}</dd>
+                <dt class="col-sm-3">接收时间</dt>
+                <dd class="col-sm-9">${created}</dd>
+                <dt class="col-sm-3">消息ID</dt>
+                <dd class="col-sm-9"><code>${msgId}</code></dd>
+            </dl>
+        `;
+        modal.show();
+    }
+
+    // Auto refresh every 20 seconds
+    let autoRefresh = setInterval(() => {
+        location.reload();
+    }, 20000);
+
+    // Stop auto refresh when user is interacting
+    document.addEventListener('click', () => {
+        clearInterval(autoRefresh);
+    });
+</script>
+{{end}}
