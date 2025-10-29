@@ -4,9 +4,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/garyburd/redigo/redis"
 	"log"
 	"strconv"
+
+	"github.com/gomodule/redigo/redis"
 )
 
 type Cache struct {

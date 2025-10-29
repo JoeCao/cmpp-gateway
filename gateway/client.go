@@ -41,7 +41,7 @@ OuterLoop:
 		case <-ticker.C:
 			req := &cmpp.CmppActiveTestReqPkt{}
 			log.Printf("send test active rep to cmpp server %v", req)
-			err := c.SendReqPkt(req)
+			_, err := c.SendReqPkt(req)
 			if err != nil {
 				log.Printf("send cmpp active response error: %s.", err)
 				log.Println("begin to reconnect")
@@ -154,7 +154,7 @@ OuterLoop:
 				MsgContent:         message.Content,
 			}
 
-			seq_id, err := c.SendReqPktWithSeqId(p)
+			seq_id, err := c.SendReqPkt(p)
 			//赋值default value
 			message.Created = time.Now()
 			message.DelivleryResult = 65535
