@@ -227,19 +227,21 @@
         }, 5000);
     }
 
-    function updateStats() {
-        // Increment submitted count
-        const statSubmitted = document.getElementById('stat-submitted');
-        if (statSubmitted) {
-            const current = parseInt(statSubmitted.textContent) || 0;
-            statSubmitted.textContent = current + 1;
+    async function updateStats() {
+        try {
+            const response = await fetch('/api/stats');
+            const stats = await response.json();
+            
+            document.getElementById('stat-submitted').textContent = stats.total || 0;
+            document.getElementById('stat-success').textContent = stats.success || 0;
+            document.getElementById('stat-failed').textContent = stats.failed || 0;
+            document.getElementById('stat-received').textContent = stats.received || 0;
+        } catch (error) {
+            console.error('Failed to update stats:', error);
         }
     }
 
-    // Auto-refresh stats every 30 seconds
-    setInterval(() => {
-        // In a real implementation, fetch stats from server
-        // For now, just a placeholder
-    }, 30000);
+    // Auto-refresh stats every 5 seconds
+    setInterval(updateStats, 5000);
 </script>
 {{end}}

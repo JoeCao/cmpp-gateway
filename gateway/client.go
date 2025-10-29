@@ -1,26 +1,27 @@
 package gateway
 
 import (
-	"github.com/bigwhite/gocmpp"
 	"log"
 	"strconv"
 	"time"
+
+	cmpp "github.com/bigwhite/gocmpp"
 )
 
 const (
 	connectTimeout time.Duration = time.Second * 2
 )
 
-//发送消息队列
+// 发送消息队列
 var Messages = make(chan SmsMes, 10)
 
-//退出消息队列
+// 退出消息队列
 var Abort = make(chan struct{})
 
-//配置文件
+// 配置文件
 var config *Config
 
-//全局的短信cmpp链接
+// 全局的短信cmpp链接
 var c *cmpp.Client
 
 func connectServer() {
@@ -131,6 +132,11 @@ OuterLoop:
 		select {
 		case message := <-Messages:
 			log.Printf("mes %v", message)
+			// 如果用户提供了扩展码（src），将其附加到SrcId后面
+			srcId := config.SmsAccessNo
+			if message.Src != "" {
+				srcId = config.SmsAccessNo + message.Src
+			}
 			p := &cmpp.Cmpp3SubmitReqPkt{
 				PkTotal:            1,
 				PkNumber:           1,
@@ -141,12 +147,12 @@ OuterLoop:
 				FeeTerminalId:      "",
 				FeeTerminalType:    0,
 				MsgFmt:             0,
-				MsgSrc:             message.Src,
+				MsgSrc:             config.User, // MsgSrc应该是企业代码，即登录用户名
 				FeeType:            "01",
 				FeeCode:            "000000",
 				ValidTime:          "",
 				AtTime:             "",
-				SrcId:              config.SmsAccessNo,
+				SrcId:              srcId,
 				DestUsrTl:          1,
 				DestTerminalId:     []string{message.Dest},
 				DestTerminalType:   0,

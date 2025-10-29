@@ -3,12 +3,13 @@ package gateway
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/JoeCao/cmpp-gateway/pages"
 	"html/template"
 	"log"
 	"net/http"
-	"strconv"
 	"path/filepath"
+	"strconv"
+
+	"github.com/JoeCao/cmpp-gateway/pages"
 )
 
 var pageSize = 5
@@ -23,9 +24,10 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	content := r.Form.Get("cont")
 	dest := r.Form.Get("dest")
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-	if src == "" || content == "" || dest == "" {
+	// src 是可选的，只检查 content 和 dest
+	if content == "" || dest == "" {
 		result, _ := json.Marshal(
-			map[string]interface{}{"result": -1, "error": "请输入 参数'src' 'dest' 'const' 缺一不可"})
+			map[string]interface{}{"result": -1, "error": "请输入参数 'dest' 和 'cont'"})
 		fmt.Fprintf(w, string(result))
 		return
 	}
@@ -130,6 +132,22 @@ func listMo(w http.ResponseWriter, r *http.Request) {
 	listMessage(w, r, "list_mo", "list_mo")
 }
 
+// getStats 返回实时统计数据的API接口
+func getStats(w http.ResponseWriter, r *http.Request) {
+	stats := SCache.GetStats()
+	totalReceived := SCache.Length("list_mo")
+
+	response := map[string]int{
+		"total":    stats["total"],
+		"success":  stats["success"],
+		"failed":   stats["failed"],
+		"received": totalReceived,
+	}
+
+	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+	json.NewEncoder(w).Encode(response)
+}
+
 // initTemplates initializes all templates with helper functions
 func initTemplates() error {
 	funcMap := template.FuncMap{
@@ -209,6 +227,7 @@ func Serve(cfg *Config) {
 	http.HandleFunc("/", index)
 	http.HandleFunc("/list_message", listSubmits)
 	http.HandleFunc("/list_mo", listMo)
+	http.HandleFunc("/api/stats", getStats)
 
 	log.Printf("HTTP server starting on %s:%s", config.HttpHost, config.HttpPort)
 	log.Fatal(http.ListenAndServe(config.HttpHost+":"+config.HttpPort, nil))
