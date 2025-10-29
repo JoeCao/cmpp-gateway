@@ -1,0 +1,9 @@
+# 此 vendor 目录由 go mod vendor 生成
+# 锁定了以下依赖的具体版本：
+# - github.com/bigwhite/gocmpp: b238366bff0b (2024-09-17)
+# - github.com/gomodule/redigo: v1.9.3
+#
+# 要更新依赖，请使用:
+# go get -u <package>
+# go mod tidy
+# go mod vendor
