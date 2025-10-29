@@ -57,20 +57,37 @@ redis-server --service-install redis.windows.conf --loglevel verbose
 ## For Developer
 ### 安装CMPP3.0网关模拟器
 
+**注意**：原 README 中提到的外部 CMPP 模拟器下载链接已失效。现在推荐使用本项目自带的模拟器。
 
-gocmpp自带一个模拟器 bigwhite/gocmpp/examples/server/server.go
-不过该模拟器仅供简单测试。
-建议下载一个比较完整的模拟器，我使用的是[CMPP模拟器](https://sites.google.com/site/cimpleteam/gateway/cmppsimulator)
-另外一个下载链接，不需要翻墙  [点这里](http://www.simpleteam.com/doku.php?id=message:cmpp_simulator)
-记得下载后，修改config.xml中的server.transceiver，将其中的
+#### 使用本项目自带的模拟器（推荐）
 
-    <timeout packet="600" message="-1"/>
-	<enquire initiative="60" passive="-1"/>
-message和passive改为-1，避免心跳的超时影响测试
+本项目在 `simulator/` 目录下提供了一个简单但完整的 CMPP 3.0 模拟器，无需 JVM，直接使用 Go 编译运行：
+
+```bash
+# 编译模拟器
+cd simulator
+go build -mod=vendor -o cmpp-simulator server.go
+
+# 运行模拟器
+./cmpp-simulator
+```
+
+详细使用说明请查看：[simulator/README.md](simulator/README.md)
+
+模拟器功能：
+- ✅ 支持 CMPP 3.0 和 CMPP 2.0 协议
+- ✅ 自动接受所有连接（无需配置用户名密码）
+- ✅ 处理短信提交，返回成功响应
+- ✅ 支持心跳检测
+- ✅ 详细的日志输出
+
+#### 其他模拟器方案
+
+如果你需要更完整的商业级模拟器，可以搜索"CMPP 模拟器"或"CMPP Simulator"，部分商业模拟器提供试用版本。
 
 > 注：
->  模拟器运行需要使用JVM，请自行下载
->  仅在调试测试需要安装，正式使用请直接连接移动网关
+>  模拟器仅用于开发测试，不会真实发送短信
+>  正式使用请直接连接移动运营商提供的 CMPP 网关
 
 ### 编译代码
 git clone https://github.com/JoeCao/cmpp-gateway.git
