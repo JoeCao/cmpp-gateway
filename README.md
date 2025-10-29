@@ -42,7 +42,8 @@ redis-server --service-install redis.windows.conf --loglevel verbose
 	  "cmpp_port": "7891",          //cmpp网关的端口
 	  "debug": true,                    //debug为true，会打印一些调试信息
 	  "redis_host": "127.0.0.1",   //redis的ip
-	  "redis_port": "6379"          //redis的端口
+	  "redis_port": "6379",          //redis的端口
+	  "redis_password": ""          //redis的密码，如果没有设置密码则留空
 	}
 
 ### 启动
