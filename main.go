@@ -27,7 +27,7 @@ func main() {
 	} else {
 		log.Fatal("加载失败 ", configPath, " => ", err)
 	}
-	gateway.StartCache(config)
+	gateway.InitCache(config)
 	defer gateway.StopCache()
 
 	go gateway.StartClient(config)

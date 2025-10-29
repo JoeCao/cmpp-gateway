@@ -1,0 +1,14 @@
+{
+  "user": "104221",
+  "password": "051992",
+  "sms_accessno": "1064899104221",
+  "service_id": "JSASXW",
+  "http_host": "0.0.0.0",
+  "http_port": "8000",
+  "cmpp_host": "127.0.0.1",
+  "cmpp_port": "7891",
+  "debug": true,
+  "cache_type": "boltdb",
+  "db_path": "./data/cmpp.db"
+}
+

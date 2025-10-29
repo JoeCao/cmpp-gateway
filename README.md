@@ -20,6 +20,7 @@
   - [编译构建](#编译构建)
   - [CMPP 模拟器](#cmpp-模拟器)
 - [技术架构](#技术架构)
+- [BoltDB 迁移指南](BOLTDB_MIGRATION.md) 📖
 - [依赖管理](#依赖管理)
 - [许可证](#许可证)
 - [致谢](#致谢)
@@ -28,10 +29,11 @@
 
 - **协议转换**：将复杂的 CMPP 3.0 协议封装为简洁的 HTTP RESTful API
 - **高并发处理**：采用 Go 协程实现异步消息处理，单连接多路复用
-- **消息追踪**：基于 Redis 实现 SEQID 和 MSGID 的完整追踪链路
+- **消息追踪**：基于嵌入式数据库实现 SEQID 和 MSGID 的完整追踪链路
+- **零外部依赖**：使用 BoltDB 嵌入式数据库，无需安装 Redis（也支持 Redis）
 - **自动重连**：内置心跳检测和断线重连机制，保障服务稳定性
 - **Web 管理界面**：提供消息历史查询和发送状态监控
-- **跨平台支持**：支持 Linux、Windows 等多种操作系统
+- **跨平台支持**：纯 Go 实现，支持 Linux、Windows、macOS，跨平台编译零障碍
 
 ## 系统架构
 
@@ -60,10 +62,10 @@
        │                │
        ▼                │
 ┌─────────────────────────────────────────────────────────────┐
-│                      Redis Cache                            │
-│  • waitseqcache: SEQID → Message 映射 (临时存储)            │
-│  • list_message: 已发送消息历史                              │
-│  • list_mo: 接收到的上行消息                                 │
+│               Cache Storage (BoltDB/Redis)                  │
+│  • wait: SEQID → Message 映射 (临时存储)                    │
+│  • messages: 已发送消息历史                                  │
+│  • mo: 接收到的上行消息                                      │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -73,24 +75,43 @@
 
 1. HTTP API 接收发送请求 → 消息入队列 `Messages` channel
 2. Sender 协程取出消息 → 调用 `SendReqPkt()` → 获得 `seq_id`
-3. 将 `{seq_id: message}` 存入 Redis `waitseqcache` 哈希表
-4. Receiver 协程接收 `SubmitRspPkt` → 通过 `seq_id` 从 Redis 查询原始消息
-5. 更新消息状态（添加 `MsgId` 和结果）→ 存入 `list_message` 列表
+3. 将 `{seq_id: message}` 存入缓存（BoltDB 的 `wait` bucket）
+4. Receiver 协程接收 `SubmitRspPkt` → 通过 `seq_id` 从缓存查询原始消息
+5. 更新消息状态（添加 `MsgId` 和结果）→ 存入 `messages` bucket
 
-> **为什么需要 Redis？**
-> CMPP 协议采用异步设计，Submit Response 中仅包含 `SeqId` 和网关生成的 `MsgId`，不包含原始消息内容。Redis 通过 SEQID 关联请求和响应，实现完整的消息追踪。
+> **为什么需要缓存？**
+> CMPP 协议采用异步设计，Submit Response 中仅包含 `SeqId` 和网关生成的 `MsgId`，不包含原始消息内容。缓存通过 SEQID 关联请求和响应，实现完整的消息追踪。
 
 ## 快速开始
 
 ### 系统要求
 
-- **Go 语言环境**：1.21 或更高版本
-- **Redis 服务器**：3.0+ 推荐（用于消息状态存储）
+- **Go 语言环境**：1.21 或更高版本（仅开发时需要）
 - **CMPP 网关**：中国移动提供的 CMPP 3.0 网关（生产环境）或本地模拟器（开发测试）
+- **可选**：Redis 服务器 3.0+（如果选择使用 Redis 而非默认的 BoltDB）
 
 ### 安装步骤
 
-#### 1. 安装 Redis
+#### 1. 选择缓存方案
+
+**方案 A：使用 BoltDB（推荐，默认）**
+
+✅ **优点**：
+- 零外部依赖，无需安装任何服务
+- 单个二进制文件即可运行
+- 纯 Go 实现，跨平台编译无障碍
+- 适合中小规模部署
+
+无需额外安装，跳到第 2 步即可。
+
+**方案 B：使用 Redis（可选）**
+
+适用于：
+- 需要分布式部署
+- 已有 Redis 基础设施
+- 超大规模消息处理
+
+##### 安装 Redis
 
 **Linux 系统**：
 ```bash
@@ -131,10 +152,12 @@ brew services start redis
 ```bash
 git clone https://github.com/JoeCao/cmpp-gateway.git
 cd cmpp-gateway
-go build -mod=vendor
+go build -mod=mod -o cmpp-gateway
 ```
 
 ### 配置说明
+
+#### 使用 BoltDB（默认推荐）
 
 在程序目录下创建或编辑 `config.json` 文件：
 
@@ -149,6 +172,27 @@ go build -mod=vendor
   "cmpp_host": "127.0.0.1",            // CMPP 网关 IP 地址
   "cmpp_port": "7891",                 // CMPP 网关端口
   "debug": true,                       // 调试模式（生产环境建议设为 false）
+  "cache_type": "boltdb",              // 缓存类型：boltdb（默认）或 redis
+  "db_path": "./data/cmpp.db"          // BoltDB 数据文件路径
+}
+```
+
+#### 使用 Redis（可选）
+
+如果选择使用 Redis，配置如下：
+
+```json
+{
+  "user": "204221",
+  "password": "052932",
+  "sms_accessno": "1064899104221",
+  "service_id": "JSASXW",
+  "http_host": "0.0.0.0",
+  "http_port": "8000",
+  "cmpp_host": "127.0.0.1",
+  "cmpp_port": "7891",
+  "debug": true,
+  "cache_type": "redis",               // 指定使用 Redis
   "redis_host": "127.0.0.1",           // Redis 服务器地址
   "redis_port": "6379",                // Redis 端口
   "redis_password": ""                 // Redis 密码（如未设置密码则留空）

@@ -27,3 +27,6 @@ simulator/cmpp-simulator
 *.swp
 *.swo
 *~
+
+# BoltDB 数据文件
+data/

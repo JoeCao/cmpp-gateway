@@ -8,7 +8,6 @@
   "cmpp_host": "127.0.0.1",
   "cmpp_port": "7891",
   "debug": true,
-  "redis_host": "127.0.0.1",
-  "redis_port": "6379",
-  "redis_password": "123456"
+  "cache_type": "boltdb",
+  "db_path": "./data/cmpp.db"
 }

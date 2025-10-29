@@ -5,18 +5,64 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"os"
 	"strconv"
 	"time"
 
 	"github.com/gomodule/redigo/redis"
 )
 
+// CacheInterface 定义缓存接口，支持多种实现
+type CacheInterface interface {
+	SetWaitCache(key uint32, message SmsMes) error
+	GetWaitCache(key uint32) (SmsMes, error)
+	AddSubmits(mes *SmsMes) error
+	AddMoList(mes *SmsMes) error
+	Length(listName string) int
+	GetStats() map[string]int
+	GetList(listName string, start, end int) *[]SmsMes
+}
+
 type Cache struct {
 	pool *redis.Pool
 }
 
-var SCache Cache = Cache{}
+var SCache CacheInterface
 
+// InitCache 根据配置初始化缓存（Redis 或 BoltDB）
+func InitCache(config *Config) {
+	// 如果未指定缓存类型，默认使用 boltdb
+	cacheType := config.CacheType
+	if cacheType == "" {
+		cacheType = "boltdb"
+	}
+
+	if cacheType == "redis" {
+		// 使用 Redis
+		log.Println("使用 Redis 作为缓存后端")
+		StartCache(config)
+	} else {
+		// 使用 BoltDB
+		log.Println("使用 BoltDB 作为缓存后端")
+		dbPath := config.DBPath
+		if dbPath == "" {
+			dbPath = "./data/cmpp.db"
+		}
+
+		// 创建数据目录
+		if err := os.MkdirAll("./data", 0755); err != nil {
+			log.Fatalf("创建数据目录失败: %v", err)
+		}
+
+		boltCache, err := StartBoltCache(dbPath)
+		if err != nil {
+			log.Fatalf("启动 BoltDB 失败: %v", err)
+		}
+		SCache = boltCache
+	}
+}
+
+// StartCache 启动Redis缓存（保留用于兼容）
 func StartCache(config *Config) {
 	// 创建Redis连接池
 	pool := &redis.Pool{
@@ -55,27 +101,34 @@ func StartCache(config *Config) {
 		log.Fatalf("连接Redis出错[%v]", err)
 	}
 
-	SCache.pool = pool
+	cache := &Cache{pool: pool}
+	SCache = cache
 	log.Printf("连接Redis %s 成功", config.RedisHost+":"+config.RedisPort)
 }
 
 func StopCache() {
-	if SCache.pool != nil {
-		SCache.pool.Close()
+	// 如果是Redis实现
+	if cache, ok := SCache.(*Cache); ok && cache.pool != nil {
+		cache.pool.Close()
+	}
+	// 如果是BoltDB实现
+	if boltCache, ok := SCache.(*BoltCache); ok {
+		boltCache.StopBoltCache()
 	}
 }
 
 // 将发送的记录转为json放到redis中保存下来,为异步返回的submit reponse做准备
-func (c *Cache) SetWaitCache(key uint32, message SmsMes) {
+func (c *Cache) SetWaitCache(key uint32, message SmsMes) error {
 	if c.pool == nil {
 		log.Printf("Cache pool not initialized, skipping SetWaitCache")
-		return
+		return errors.New("cache pool not initialized")
 	}
 	conn := c.pool.Get()
 	defer conn.Close()
 
 	data, _ := json.Marshal(message)
-	conn.Do("HSET", "waitseqcache", strconv.FormatUint(uint64(key), 10), data)
+	_, err := conn.Do("HSET", "waitseqcache", strconv.FormatUint(uint64(key), 10), data)
+	return err
 }
 
 func (c *Cache) GetWaitCache(key uint32) (SmsMes, error) {
@@ -99,10 +152,10 @@ func (c *Cache) GetWaitCache(key uint32) (SmsMes, error) {
 
 }
 
-func (c *Cache) AddSubmits(mes *SmsMes) {
+func (c *Cache) AddSubmits(mes *SmsMes) error {
 	if c.pool == nil {
 		log.Printf("Cache pool not initialized, skipping AddSubmits")
-		return
+		return errors.New("cache pool not initialized")
 	}
 	conn := c.pool.Get()
 	defer conn.Close()
@@ -110,15 +163,16 @@ func (c *Cache) AddSubmits(mes *SmsMes) {
 	//将submit结果提交到redis的队列存放
 	data, _ := json.Marshal(mes)
 	//新的记录加在头部,自然就倒序排列了
-	conn.Do("LPUSH", "list_message", data)
+	_, err := conn.Do("LPUSH", "list_message", data)
 	//只保留最近五十条
 	//conn.Do("LTRIM", "submitlist", "0", "49")
+	return err
 }
 
-func (c *Cache) AddMoList(mes *SmsMes) {
+func (c *Cache) AddMoList(mes *SmsMes) error {
 	if c.pool == nil {
 		log.Printf("Cache pool not initialized, skipping AddMoList")
-		return
+		return errors.New("cache pool not initialized")
 	}
 	conn := c.pool.Get()
 	defer conn.Close()
@@ -126,9 +180,10 @@ func (c *Cache) AddMoList(mes *SmsMes) {
 	//将submit结果提交到redis的队列存放
 	data, _ := json.Marshal(mes)
 	//新的记录加在头部,自然就倒序排列了
-	conn.Do("LPUSH", "list_mo", data)
+	_, err := conn.Do("LPUSH", "list_mo", data)
 	//只保留最近五十条
 	//conn.Do("LTRIM", "molist", "0", "49")
+	return err
 }
 
 func (c *Cache) Length(listName string) int {
