@@ -47,7 +47,9 @@ func (cli *Client) Connect(servAddr, user, password string, timeout time.Duratio
 	cli.conn = NewConn(conn, cli.typ)
 	defer func() {
 		if err != nil {
-			cli.conn.Close()
+			if cli.conn != nil {
+				cli.conn.Close()
+			}
 		}
 	}()
 	cli.conn.SetState(CONN_CONNECTED)
@@ -59,12 +61,12 @@ func (cli *Client) Connect(servAddr, user, password string, timeout time.Duratio
 		Version: cli.typ,
 	}
 
-	err = cli.SendReqPkt(req)
+	_, err = cli.SendReqPkt(req)
 	if err != nil {
 		return err
 	}
 
-	p, err := cli.conn.RecvAndUnpackPkt(0)
+	p, err := cli.conn.RecvAndUnpackPkt(timeout)
 	if err != nil {
 		return err
 	}
@@ -74,20 +76,27 @@ func (cli *Client) Connect(servAddr, user, password string, timeout time.Duratio
 	if cli.typ == V20 || cli.typ == V21 {
 		var rsp *Cmpp2ConnRspPkt
 		rsp, ok = p.(*Cmpp2ConnRspPkt)
+		if !ok {
+			err = ErrRespNotMatch
+			return err
+		}
 		status = rsp.Status
 	} else {
 		var rsp *Cmpp3ConnRspPkt
 		rsp, ok = p.(*Cmpp3ConnRspPkt)
+		if !ok {
+			err = ErrRespNotMatch
+			return err
+		}
 		status = uint8(rsp.Status)
 	}
 
-	if !ok {
-		err = ErrRespNotMatch
-		return err
-	}
-
 	if status != 0 {
-		err = ConnRspStatusErrMap[status]
+		if status <= ErrnoConnOthers { //ErrnoConnOthers = 5
+			err = ConnRspStatusErrMap[status]
+		} else {
+			err = ConnRspStatusErrMap[ErrnoConnOthers]
+		}
 		return err
 	}
 
@@ -96,17 +105,15 @@ func (cli *Client) Connect(servAddr, user, password string, timeout time.Duratio
 }
 
 func (cli *Client) Disconnect() {
-	cli.conn.Close()
+	if cli.conn != nil {
+		cli.conn.Close()
+	}
 }
 
 // SendReqPkt pack the cmpp request packet structure and send it to the other peer.
-func (cli *Client) SendReqPkt(packet Packer) error {
-	return cli.conn.SendPkt(packet, <-cli.conn.SeqId)
-}
-
-func (cli *Client) SendReqPktWithSeqId(packet Packer) (uint32, error) {
-	seq_id := <-cli.conn.SeqId
-	return seq_id, cli.conn.SendPkt(packet, seq_id)
+func (cli *Client) SendReqPkt(packet Packer) (uint32, error) {
+	seq := <-cli.conn.SeqId
+	return seq, cli.conn.SendPkt(packet, seq)
 }
 
 // SendRspPkt pack the cmpp response packet structure and send it to the other peer.

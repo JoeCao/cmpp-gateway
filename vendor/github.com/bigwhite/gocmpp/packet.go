@@ -95,7 +95,7 @@ func (id CommandId) String() string {
 			"CMPP_ACTIVE_TEST",
 			"CMPP_FWD",
 		}[id-1]
-	} else if id < CMPP_REQUEST_MAX {
+	} else if id >= CMPP_MT_ROUTE && id < CMPP_REQUEST_MAX {
 		return []string{
 			"CMPP_MT_ROUTE",
 			"CMPP_MO_ROUTE",
@@ -108,7 +108,7 @@ func (id CommandId) String() string {
 		}[id-0x00000010]
 	}
 
-	if id < CMPP_FWD_RESP && id > CMPP_RESPONSE_MIN {
+	if id <= CMPP_FWD_RESP && id > CMPP_RESPONSE_MIN {
 		return []string{
 			"CMPP_CONNECT_RESP",
 			"CMPP_TERMINATE_RESP",
@@ -120,7 +120,7 @@ func (id CommandId) String() string {
 			"CMPP_ACTIVE_TEST_RESP",
 			"CMPP_FWD_RESP",
 		}[id-0x80000001]
-	} else if id < CMPP_RESPONSE_MAX {
+	} else if id >= CMPP_MT_ROUTE_RESP && id < CMPP_RESPONSE_MAX {
 		return []string{
 			"CMPP_MT_ROUTE_RESP",
 			"CMPP_MO_ROUTE_RESP",
@@ -198,7 +198,7 @@ func (w *packetWriter) Bytes() ([]byte, error) {
 	return (w.wb.Bytes())[:len], nil
 }
 
-// WriteInt appends the byte of b to the inner buffer, growing the buffer as
+// WriteByte appends the byte of b to the inner buffer, growing the buffer as
 // needed.
 func (w *packetWriter) WriteByte(b byte) {
 	if w.err != nil {
@@ -214,7 +214,7 @@ func (w *packetWriter) WriteByte(b byte) {
 }
 
 // WriteFixedSizeString writes a string to buffer, if the length of s is less than size,
-// Pad binary zero to the left bytes.
+// Pad binary zero to the right.
 func (w *packetWriter) WriteFixedSizeString(s string, size int) {
 	if w.err != nil {
 		return
@@ -307,7 +307,7 @@ func (r *packetReader) ReadByte() byte {
 	return b
 }
 
-// Read reads structured binary data from r into data.
+// ReadInt reads reads structured binary data from r into data.
 // Data must be a pointer to a fixed-size value or a slice
 // of fixed-size values.
 // Bytes read from r are decoded using the specified byte order

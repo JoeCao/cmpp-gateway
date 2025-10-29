@@ -3,10 +3,10 @@ package main
 import (
 	"encoding/json"
 	"flag"
-	"github.com/JoeCao/cmpp-gateway/gateway"
-	"io/ioutil"
 	"log"
 	"os"
+
+	"github.com/JoeCao/cmpp-gateway/gateway"
 )
 
 func main() {
@@ -50,12 +50,7 @@ func LoadJsonFile(filePath string, obj interface{}) error {
 }
 
 func ReadBytes(filePath string) ([]byte, error) {
-	file, err := os.Open(filePath)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-	data, err := ioutil.ReadAll(file)
+	data, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, err
 	}

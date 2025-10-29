@@ -1,15 +1,17 @@
 language: go
 
 go:
-    - 1.5.1
-    - tip
+    - 1.10.1
+    - 1.12.5
 os:
     - linux
     - osx
-    - windows
 
 env:
-    - GO15VENDOREXPERIMENT="1"
+
+before_install:
+    - go get github.com/mattn/goveralls
 
 script: 
-    - make
+    - make build
+    - $GOPATH/bin/goveralls -service=travis-ci

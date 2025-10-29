@@ -26,7 +26,9 @@ type State uint8
 
 // Errors for conn operations
 var (
-	ErrConnIsClosed = errors.New("connection is closed")
+	ErrConnIsClosed       = errors.New("connection is closed")
+	ErrReadCmdIDTimeout   = errors.New("read commandId timeout")
+	ErrReadPktBodyTimeout = errors.New("read packet body timeout")
 )
 
 var noDeadline = time.Time{}
@@ -139,17 +141,15 @@ func (c *Conn) RecvAndUnpackPkt(timeout time.Duration) (interface{}, error) {
 	if c.State == CONN_CLOSED {
 		return nil, ErrConnIsClosed
 	}
-
-	if timeout != 0 {
-		t := time.Now().Add(timeout)
-		c.SetReadDeadline(t)
-		defer c.SetReadDeadline(noDeadline)
-	}
+	defer c.SetReadDeadline(noDeadline)
 
 	rb := readBufferPool.Get().(*readBuffer)
 	defer readBufferPool.Put(rb)
 
 	// Total_Length in packet
+	if timeout != 0 {
+		c.SetReadDeadline(time.Now().Add(timeout))
+	}
 	err := binary.Read(c.Conn, binary.BigEndian, &rb.totalLen)
 	if err != nil {
 		return nil, err
@@ -168,8 +168,17 @@ func (c *Conn) RecvAndUnpackPkt(timeout time.Duration) (interface{}, error) {
 	}
 
 	// Command_Id
+	if timeout != 0 {
+		c.SetReadDeadline(time.Now().Add(timeout))
+	}
 	err = binary.Read(c.Conn, binary.BigEndian, &rb.commandId)
 	if err != nil {
+		netErr, ok := err.(net.Error)
+		if ok {
+			if netErr.Timeout() {
+				return nil, ErrReadCmdIDTimeout
+			}
+		}
 		return nil, err
 	}
 
@@ -179,9 +188,18 @@ func (c *Conn) RecvAndUnpackPkt(timeout time.Duration) (interface{}, error) {
 	}
 
 	// The left packet data (start from seqId in header).
+	if timeout != 0 {
+		c.SetReadDeadline(time.Now().Add(timeout))
+	}
 	var leftData = rb.leftData[0:(rb.totalLen - 8)]
 	_, err = io.ReadFull(c.Conn, leftData)
 	if err != nil {
+		netErr, ok := err.(net.Error)
+		if ok {
+			if netErr.Timeout() {
+				return nil, ErrReadPktBodyTimeout
+			}
+		}
 		return nil, err
 	}
 
