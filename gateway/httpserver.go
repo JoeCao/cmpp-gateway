@@ -155,6 +155,12 @@ func initTemplates() error {
 		"sub": func(a, b int) int { return a - b },
 		"mul": func(a, b int) int { return a * b },
 		"eq":  func(a, b interface{}) bool { return a == b },
+		"isSuccess": func(result uint32) bool {
+			return result == 0
+		},
+		"isWaiting": func(result uint32) bool {
+			return result == 65535
+		},
 		"pageRange": func(current, total int) []int {
 			// Generate page range for pagination (max 5 pages)
 			start := current - 2

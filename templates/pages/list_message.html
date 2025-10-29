@@ -123,13 +123,21 @@
                                 <code class="small">{{$item.MsgId}}</code>
                             </td>
                             <td>
-                                {{if eq $item.SubmitResult 0}}
+                                {{if isSuccess $item.SubmitResult}}
                                     <span class="badge bg-success">
                                         <i class="bi bi-check-circle"></i> 成功
                                     </span>
-                                {{else if eq $item.DelivleryResult 65535}}
+                                {{else if isWaiting $item.SubmitResult}}
                                     <span class="badge bg-warning text-dark">
-                                        <i class="bi bi-hourglass-split"></i> 等待
+                                        <i class="bi bi-hourglass-split"></i> 等待响应
+                                    </span>
+                                {{else if eq $item.SubmitResult 254}}
+                                    <span class="badge bg-danger">
+                                        <i class="bi bi-x-circle"></i> 发送失败
+                                    </span>
+                                {{else if eq $item.SubmitResult 255}}
+                                    <span class="badge bg-danger">
+                                        <i class="bi bi-x-circle"></i> 参数错误
                                     </span>
                                 {{else}}
                                     <span class="badge bg-danger">

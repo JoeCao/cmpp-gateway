@@ -57,13 +57,13 @@
             <div class="card-body">
                 <form id="sms-form">
                     <div class="mb-3">
-                        <label for="src" class="form-label">源号码</label>
-                        <div class="form-check">
-                            <input class="form-check-input" type="radio" name="src" id="src1" value="{{.DefaultSrc}}" checked>
-                            <label class="form-check-label" for="src1">
-                                {{.DefaultSrc}}
-                            </label>
+                        <label for="src" class="form-label">源号码 (扩展码可选)</label>
+                        <div class="input-group">
+                            <span class="input-group-text">{{.DefaultSrc}}</span>
+                            <input type="text" class="form-control" name="src" id="src" 
+                                   placeholder="扩展码（选填，如：01、02）" maxlength="6" pattern="[0-9]*">
                         </div>
+                        <div class="form-text">不填写则使用默认号码，填写则追加扩展码</div>
                     </div>
 
                     <div class="mb-3">

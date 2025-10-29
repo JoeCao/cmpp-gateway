@@ -20,8 +20,8 @@ var SCache Cache = Cache{}
 func StartCache(config *Config) {
 	// 创建Redis连接池
 	pool := &redis.Pool{
-		MaxIdle:     10,               // 最大空闲连接数
-		MaxActive:   30,               // 最大活跃连接数，0表示无限制
+		MaxIdle:     10,                // 最大空闲连接数
+		MaxActive:   30,                // 最大活跃连接数，0表示无限制
 		IdleTimeout: 240 * time.Second, // 空闲连接超时时间
 		Wait:        true,              // 连接池满时等待可用连接
 		Dial: func() (redis.Conn, error) {
@@ -65,7 +65,7 @@ func StopCache() {
 	}
 }
 
-//将发送的记录转为json放到redis中保存下来,为异步返回的submit reponse做准备
+// 将发送的记录转为json放到redis中保存下来,为异步返回的submit reponse做准备
 func (c *Cache) SetWaitCache(key uint32, message SmsMes) {
 	if c.pool == nil {
 		log.Printf("Cache pool not initialized, skipping SetWaitCache")
@@ -180,14 +180,17 @@ func (c *Cache) GetStats() map[string]int {
 	// 统计成功和失败数量
 	successCount := 0
 	failedCount := 0
+	waitingCount := 0
 
 	for _, value := range values {
 		mes := SmsMes{}
 		if err := json.Unmarshal([]byte(value), &mes); err == nil {
 			if mes.SubmitResult == 0 {
 				successCount++
+			} else if mes.SubmitResult == 65535 {
+				waitingCount++ // 等待响应，不算失败
 			} else {
-				failedCount++
+				failedCount++ // 其他状态都算失败
 			}
 		}
 	}

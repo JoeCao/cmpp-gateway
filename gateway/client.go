@@ -60,6 +60,12 @@ func startReceiver() {
 		if !isRunning() {
 			break
 		}
+		// 检查连接是否有效
+		if c == nil {
+			log.Printf("client连接为空，退出receiver")
+			time.Sleep(time.Second) // 避免CPU空转
+			break
+		}
 		// recv packets
 		i, err := c.RecvAndUnpackPkt(0)
 		if err != nil {
@@ -131,12 +137,29 @@ OuterLoop:
 	for {
 		select {
 		case message := <-Messages:
-			log.Printf("mes %v", message)
+			log.Printf("收到待发送消息: Src=%s, Dest=%s, Content=%s", message.Src, message.Dest, message.Content)
+
+			// 构建实际的发送号码
 			// 如果用户提供了扩展码（src），将其附加到SrcId后面
 			srcId := config.SmsAccessNo
-			if message.Src != "" {
+			if message.Src != "" && message.Src != config.SmsAccessNo {
+				// 只有当 src 不是完整号码时才追加
 				srcId = config.SmsAccessNo + message.Src
+				log.Printf("使用扩展码: %s -> %s", message.Src, srcId)
 			}
+
+			// 检查 SrcId 长度（CMPP协议要求最大21字节）
+			if len(srcId) > 21 {
+				log.Printf("错误: SrcId 长度超过21字节: %s (长度: %d)", srcId, len(srcId))
+				// 记录失败消息
+				message.Created = time.Now()
+				message.SubmitResult = 255 // 255表示本地错误
+				message.DelivleryResult = 65535
+				message.MsgId = "ERROR"
+				SCache.AddSubmits(&message)
+				continue
+			}
+
 			p := &cmpp.Cmpp3SubmitReqPkt{
 				PkTotal:            1,
 				PkNumber:           1,
@@ -147,7 +170,7 @@ OuterLoop:
 				FeeTerminalId:      "",
 				FeeTerminalType:    0,
 				MsgFmt:             0,
-				MsgSrc:             config.User, // MsgSrc应该是企业代码，即登录用户名
+				MsgSrc:             config.User, // MsgSrc应该是企业代码，即登录用户名（6字节）
 				FeeType:            "01",
 				FeeCode:            "000000",
 				ValidTime:          "",
@@ -161,15 +184,20 @@ OuterLoop:
 			}
 
 			seq_id, err := c.SendReqPkt(p)
-			//赋值default value
 			message.Created = time.Now()
 			message.DelivleryResult = 65535
-			message.SubmitResult = 65535
-			SCache.SetWaitCache(seq_id, message)
+
 			if err != nil {
-				log.Printf("client : send a cmpp3 submit request error: %s.", err)
+				log.Printf("发送CMPP请求失败: %s", err)
+				// 发送失败，直接记录到列表，标记为失败
+				message.SubmitResult = 254 // 254表示发送失败
+				message.MsgId = "SEND_ERROR"
+				SCache.AddSubmits(&message)
 			} else {
-				log.Printf("client: send a cmpp3 submit request ok")
+				log.Printf("发送CMPP请求成功，等待响应 (SeqId: %d)", seq_id)
+				// 发送成功，等待响应
+				message.SubmitResult = 65535 // 等待响应
+				SCache.SetWaitCache(seq_id, message)
 			}
 		case <-Abort:
 			break OuterLoop
