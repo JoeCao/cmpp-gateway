@@ -118,6 +118,35 @@ func (c *BoltCache) GetWaitCache(key uint32) (SmsMes, error) {
 	return mes, err
 }
 
+// GetWaitList 获取所有等待响应的消息
+func (c *BoltCache) GetWaitList() []SmsMes {
+	if c.db == nil {
+		return []SmsMes{}
+	}
+
+	result := make([]SmsMes, 0)
+
+	c.db.View(func(tx *bolt.Tx) error {
+		b := tx.Bucket(waitBucket)
+		if b == nil {
+			return nil
+		}
+
+		// 遍历所有等待的消息
+		cursor := b.Cursor()
+		for k, v := cursor.First(); k != nil; k, v = cursor.Next() {
+			mes := SmsMes{}
+			if err := json.Unmarshal(v, &mes); err == nil {
+				result = append(result, mes)
+			}
+		}
+
+		return nil
+	})
+
+	return result
+}
+
 // AddSubmits 添加提交消息到列表
 func (c *BoltCache) AddSubmits(mes *SmsMes) error {
 	if c.db == nil {

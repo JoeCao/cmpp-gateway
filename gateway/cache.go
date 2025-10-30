@@ -17,6 +17,7 @@ import (
 type CacheInterface interface {
 	SetWaitCache(key uint32, message SmsMes) error
 	GetWaitCache(key uint32) (SmsMes, error)
+	GetWaitList() []SmsMes // 获取所有等待响应的消息
 	AddSubmits(mes *SmsMes) error
 	AddMoList(mes *SmsMes) error
 	Length(listName string) int
@@ -153,6 +154,31 @@ func (c *Cache) GetWaitCache(key uint32) (SmsMes, error) {
 		return mes, errors.New("no key in cache")
 	}
 
+}
+
+// GetWaitList 获取所有等待响应的消息
+func (c *Cache) GetWaitList() []SmsMes {
+	if c.pool == nil {
+		return []SmsMes{}
+	}
+	conn := c.pool.Get()
+	defer conn.Close()
+
+	// 获取 hash 中所有的值
+	values, err := redis.Strings(conn.Do("HVALS", "waitseqcache"))
+	if err != nil {
+		return []SmsMes{}
+	}
+
+	result := make([]SmsMes, 0, len(values))
+	for _, value := range values {
+		mes := SmsMes{}
+		if json.Unmarshal([]byte(value), &mes) == nil {
+			result = append(result, mes)
+		}
+	}
+
+	return result
 }
 
 func (c *Cache) AddSubmits(mes *SmsMes) error {

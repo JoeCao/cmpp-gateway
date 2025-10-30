@@ -148,6 +148,12 @@ func listMessage(w http.ResponseWriter, r *http.Request, listName string, active
 	var count int
 	var v *[]SmsMes
 
+	// 如果是发送列表，需要合并等待响应的消息
+	var waitList []SmsMes
+	if listName == "list_message" {
+		waitList = SCache.GetWaitList()
+	}
+
 	// 如果有搜索条件，使用搜索功能
 	if len(filters) > 0 {
 		count = SCache.GetSearchCount(listName, filters)
@@ -156,8 +162,31 @@ func listMessage(w http.ResponseWriter, r *http.Request, listName string, active
 	} else {
 		// 普通分页查询
 		count = SCache.Length(listName)
+
+		// 如果是发送列表，总数需要加上等待列表的数量
+		if listName == "list_message" {
+			count += len(waitList)
+		}
+
 		page := pages.NewPage(c_page, pageSize, count)
 		v = SCache.GetList(listName, page.StartRow, page.EndRow)
+
+		// 合并等待列表（等待的消息显示在最前面）
+		if listName == "list_message" && len(waitList) > 0 {
+			// 将等待列表添加到结果前面
+			merged := append(waitList, *v...)
+
+			// 根据分页截取数据
+			start := page.StartRow
+			end := page.EndRow + 1
+			if start < len(merged) {
+				if end > len(merged) {
+					end = len(merged)
+				}
+				result := merged[start:end]
+				v = &result
+			}
+		}
 	}
 
 	data := struct {
