@@ -1,12 +1,17 @@
 package main
 
 import (
+	"flag"
 	"log"
 	"math/rand"
 	"os"
 	"time"
 
 	cmpp "github.com/bigwhite/gocmpp"
+)
+
+var (
+	maxDelay int // Maximum delay in seconds (configurable via command line)
 )
 
 // ConnAuthHandler handles CMPP connection authentication
@@ -40,8 +45,14 @@ func (h *SubmitHandler) ServeCmpp(r *cmpp.Response, p *cmpp.Packet, l *log.Logge
 	case *cmpp.Cmpp3SubmitReqPkt:
 		rsp := r.Packer.(*cmpp.Cmpp3SubmitRspPkt)
 
-		// Random delay between 1s and 3s to simulate processing time
-		delay := time.Duration(1000+rand.Intn(2001)) * time.Millisecond
+		// Log the incoming request first
+		l.Printf("[Submit] CMPP 3.0 Submit Request: PkTotal=%d, PkNumber=%d, DestTerminalId=%s, MsgContent=%s\n",
+			req.PkTotal, req.PkNumber, req.DestTerminalId, string(req.MsgContent))
+
+		// Random delay between 1s and maxDelay to simulate processing time
+		delayMs := 1000 + rand.Intn(maxDelay*1000)
+		delay := time.Duration(delayMs) * time.Millisecond
+		l.Printf("[Submit] Simulating processing delay: %v\n", delay)
 		time.Sleep(delay)
 
 		// Generate a unique MsgId (8 bytes)
@@ -51,15 +62,18 @@ func (h *SubmitHandler) ServeCmpp(r *cmpp.Response, p *cmpp.Packet, l *log.Logge
 		rsp.MsgId = msgId
 		rsp.Result = 0 // 0 = success
 
-		l.Printf("[Submit] CMPP 3.0 Submit Request: PkTotal=%d, PkNumber=%d, DestTerminalId=%s, MsgContent=%s\n",
-			req.PkTotal, req.PkNumber, req.DestTerminalId, string(req.MsgContent))
-		l.Printf("[Submit] Response: MsgId=%d, Result=0 (success), Delay=%v\n", msgId, delay)
+		l.Printf("[Submit] Response: MsgId=%d, Result=0 (success)\n", msgId)
 
 	case *cmpp.Cmpp2SubmitReqPkt:
 		rsp := r.Packer.(*cmpp.Cmpp2SubmitRspPkt)
 
-		// Random delay between 1s and 3s to simulate processing time
-		delay := time.Duration(1000+rand.Intn(2001)) * time.Millisecond
+		// Log the incoming request first
+		l.Printf("[Submit] CMPP 2.0 Submit Request: DestTerminalId=%s\n", req.DestTerminalId)
+
+		// Random delay between 1s and maxDelay to simulate processing time
+		delayMs := 1000 + rand.Intn(maxDelay*1000)
+		delay := time.Duration(delayMs) * time.Millisecond
+		l.Printf("[Submit] Simulating processing delay: %v\n", delay)
 		time.Sleep(delay)
 
 		// Generate a unique MsgId
@@ -69,8 +83,7 @@ func (h *SubmitHandler) ServeCmpp(r *cmpp.Response, p *cmpp.Packet, l *log.Logge
 		rsp.MsgId = msgId
 		rsp.Result = 0
 
-		l.Printf("[Submit] CMPP 2.0 Submit Request: DestTerminalId=%s\n", req.DestTerminalId)
-		l.Printf("[Submit] Response: MsgId=%d, Result=0 (success), Delay=%v\n", msgId, delay)
+		l.Printf("[Submit] Response: MsgId=%d, Result=0 (success)\n", msgId)
 	}
 	return true, nil
 }
@@ -101,6 +114,15 @@ func (h *TerminateHandler) ServeCmpp(r *cmpp.Response, p *cmpp.Packet, l *log.Lo
 }
 
 func main() {
+	// Parse command line flags
+	flag.IntVar(&maxDelay, "delay", 3, "Maximum delay in seconds for submit response (1-30, default: 3)")
+	flag.Parse()
+
+	// Validate delay parameter
+	if maxDelay < 1 || maxDelay > 30 {
+		log.Fatalf("Invalid delay value: %d. Must be between 1 and 30 seconds", maxDelay)
+	}
+
 	// Server configuration
 	addr := "127.0.0.1:7891" // Default CMPP port
 	typ := cmpp.V30          // CMPP 3.0 protocol
@@ -124,6 +146,7 @@ func main() {
 	log.Printf("Listening on: %s", addr)
 	log.Printf("Protocol: CMPP 3.0")
 	log.Printf("Heartbeat interval: %v", t)
+	log.Printf("Submit delay: 1s - %ds (random)", maxDelay)
 	log.Printf("==========================================")
 	log.Printf("Ready to accept connections...")
 	log.Printf("")
