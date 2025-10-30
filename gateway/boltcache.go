@@ -291,11 +291,11 @@ func (c *BoltCache) GetList(listName string, start, end int) *[]SmsMes {
 			return nil
 		}
 
-		// 倒序遍历（从最新到最旧）
+		// 正序遍历（由于使用了反转时间戳作为key，正序即为最新→最旧）
 		cursor := b.Cursor()
 		idx := 0
 
-		for k, v := cursor.Last(); k != nil; k, v = cursor.Prev() {
+		for k, v := cursor.First(); k != nil; k, v = cursor.Next() {
 			// 跳过 start 之前的记录
 			if idx < start {
 				idx++
