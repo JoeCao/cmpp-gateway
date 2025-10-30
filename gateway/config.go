@@ -2,7 +2,7 @@ package gateway
 
 import (
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"log"
 	"os"
 )
@@ -40,7 +40,7 @@ func (c *Config) LoadFile(path string) {
 	if err != nil {
 		log.Fatalf("读取配置文件[%s]出错[%v]", path, err)
 	} else {
-		fileData, err := ioutil.ReadAll(file)
+		fileData, err := io.ReadAll(file)
 		if err != nil {
 			log.Fatalf("读取配置文件内容[%s]出错[%v]", path, err)
 		} else {
