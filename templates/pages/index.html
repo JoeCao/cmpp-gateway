@@ -207,7 +207,12 @@
 
             if (data.result === 0) {
                 showAlert('success', '发送成功', '短信已成功提交到发送队列');
+                // 保存接收号码
+                const destValue = document.getElementById('dest').value;
+                // 清空表单
                 smsForm.reset();
+                // 恢复接收号码
+                document.getElementById('dest').value = destValue;
                 charCount.textContent = '0';
                 updateStats();
             } else {
