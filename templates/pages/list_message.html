@@ -13,23 +13,26 @@
         <form class="row g-3" id="filter-form">
             <div class="col-md-3">
                 <label for="filter-dest" class="form-label">接收号码</label>
-                <input type="text" class="form-control" id="filter-dest" placeholder="手机号码">
+                <input type="text" class="form-control" id="filter-dest" name="dest" placeholder="手机号码" value="{{.Filters.dest}}">
             </div>
             <div class="col-md-3">
                 <label for="filter-status" class="form-label">发送状态</label>
-                <select class="form-select" id="filter-status">
+                <select class="form-select" id="filter-status" name="status">
                     <option value="">全部</option>
-                    <option value="0">成功</option>
-                    <option value="1">失败</option>
+                    <option value="0" {{if eq .Filters.status "0"}}selected{{end}}>成功</option>
+                    <option value="1" {{if eq .Filters.status "1"}}selected{{end}}>失败</option>
                 </select>
             </div>
             <div class="col-md-4">
                 <label for="filter-content" class="form-label">内容关键词</label>
-                <input type="text" class="form-control" id="filter-content" placeholder="搜索内容">
+                <input type="text" class="form-control" id="filter-content" name="content" placeholder="搜索内容" value="{{.Filters.content}}">
             </div>
-            <div class="col-md-2 d-flex align-items-end">
-                <button type="submit" class="btn btn-primary w-100">
+            <div class="col-md-2 d-flex align-items-end gap-2">
+                <button type="submit" class="btn btn-primary flex-fill">
                     <i class="bi bi-search"></i> 搜索
+                </button>
+                <button type="button" class="btn btn-outline-secondary" onclick="clearSearch()">
+                    <i class="bi bi-x-circle"></i> 清除
                 </button>
             </div>
         </form>
@@ -173,7 +176,7 @@
                     </li>
                 {{else}}
                     <li class="page-item">
-                        <a class="page-link" href="?page={{.Page.LastPage}}">
+                        <a class="page-link" href="{{buildPageURL .Page.LastPage $.Filters}}">
                             <i class="bi bi-chevron-left"></i> 上一页
                         </a>
                     </li>
@@ -182,7 +185,7 @@
                 <!-- Page numbers -->
                 {{range $i := pageRange .Page.CurrentPage .Page.TotalPage}}
                     <li class="page-item {{if eq $i $.Page.CurrentPage}}active{{end}}">
-                        <a class="page-link" href="?page={{$i}}">{{$i}}</a>
+                        <a class="page-link" href="{{buildPageURL $i $.Filters}}">{{$i}}</a>
                     </li>
                 {{end}}
 
@@ -194,7 +197,7 @@
                     </li>
                 {{else}}
                     <li class="page-item">
-                        <a class="page-link" href="?page={{.Page.NextPage}}">
+                        <a class="page-link" href="{{buildPageURL .Page.NextPage $.Filters}}">
                             下一页 <i class="bi bi-chevron-right"></i>
                         </a>
                     </li>
@@ -216,14 +219,37 @@
     // Filter form submission
     document.getElementById('filter-form').addEventListener('submit', function(e) {
         e.preventDefault();
-        // In a real implementation, this would filter the results
-        alert('过滤功能需要后端API支持，当前为演示版本');
+
+        // Build URL with search parameters
+        const formData = new FormData(this);
+        const params = new URLSearchParams();
+
+        // Add form fields to URL parameters
+        for (const [key, value] of formData.entries()) {
+            if (value.trim() !== '') {
+                params.append(key, value);
+            }
+        }
+
+        // Reset to page 1 for new search
+        params.set('page', '1');
+
+        // Redirect to search results
+        window.location.href = '?' + params.toString();
     });
 
-    // Auto refresh every 15 seconds
+    // Clear search function
+    function clearSearch() {
+        window.location.href = '?';
+    }
+
+    // Auto refresh every 30 seconds (reduced to avoid interfering with searches)
     let autoRefresh = setInterval(() => {
-        location.reload();
-    }, 15000);
+        // Only refresh if there are no search parameters
+        if (!window.location.search || window.location.search === '?page=1') {
+            location.reload();
+        }
+    }, 30000);
 
     // Stop auto refresh when user is interacting
     document.addEventListener('click', () => {

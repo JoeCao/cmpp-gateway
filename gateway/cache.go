@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gomodule/redigo/redis"
@@ -21,6 +22,8 @@ type CacheInterface interface {
 	Length(listName string) int
 	GetStats() map[string]int
 	GetList(listName string, start, end int) *[]SmsMes
+	SearchList(listName string, filters map[string]string, start, end int) *[]SmsMes
+	GetSearchCount(listName string, filters map[string]string) int
 }
 
 type Cache struct {
@@ -283,4 +286,150 @@ func (c *Cache) GetList(listName string, start, end int) *[]SmsMes {
 		v = append(v, mes)
 	}
 	return &v
+}
+
+// SearchList 在Redis中搜索消息列表
+func (c *Cache) SearchList(listName string, filters map[string]string, start, end int) *[]SmsMes {
+	if c.pool == nil {
+		return &[]SmsMes{}
+	}
+	conn := c.pool.Get()
+	defer conn.Close()
+
+	// 获取所有数据（Redis不支持复杂的搜索，需要内存过滤）
+	totalCount, _ := redis.Int(conn.Do("LLEN", listName))
+	if totalCount == 0 {
+		return &[]SmsMes{}
+	}
+
+	// 获取所有记录进行过滤
+	values, err := redis.Strings(conn.Do("LRANGE", listName, 0, totalCount-1))
+	if err != nil {
+		return &[]SmsMes{}
+	}
+
+	// 过滤消息
+	var filteredMessages []SmsMes
+	for _, s := range values {
+		mes := SmsMes{}
+		if json.Unmarshal([]byte(s), &mes) != nil {
+			continue
+		}
+
+		if c.matchFilters(&mes, filters, listName) {
+			filteredMessages = append(filteredMessages, mes)
+		}
+	}
+
+	// 分页处理
+	result := make([]SmsMes, 0)
+	if start < len(filteredMessages) {
+		end := end + 1
+		if end > len(filteredMessages) {
+			end = len(filteredMessages)
+		}
+		result = filteredMessages[start:end]
+	}
+
+	return &result
+}
+
+// GetSearchCount 获取搜索结果的数量
+func (c *Cache) GetSearchCount(listName string, filters map[string]string) int {
+	if c.pool == nil {
+		return 0
+	}
+	conn := c.pool.Get()
+	defer conn.Close()
+
+	// 获取所有数据
+	totalCount, _ := redis.Int(conn.Do("LLEN", listName))
+	if totalCount == 0 {
+		return 0
+	}
+
+	// 获取所有记录进行过滤
+	values, err := redis.Strings(conn.Do("LRANGE", listName, 0, totalCount-1))
+	if err != nil {
+		return 0
+	}
+
+	// 统计匹配的消息数量
+	count := 0
+	for _, s := range values {
+		mes := SmsMes{}
+		if json.Unmarshal([]byte(s), &mes) != nil {
+			continue
+		}
+
+		if c.matchFilters(&mes, filters, listName) {
+			count++
+		}
+	}
+
+	return count
+}
+
+// matchFilters 检查消息是否匹配过滤条件
+func (c *Cache) matchFilters(mes *SmsMes, filters map[string]string, listName string) bool {
+	// 如果没有过滤条件，都匹配
+	if len(filters) == 0 {
+		return true
+	}
+
+	// 通用过滤条件
+	if content, ok := filters["content"]; ok && content != "" {
+		if !contains(mes.Content, content) {
+			return false
+		}
+	}
+
+	if listName == "list_message" {
+		// 下发消息特定过滤
+		if dest, ok := filters["dest"]; ok && dest != "" {
+			if !contains(mes.Dest, dest) {
+				return false
+			}
+		}
+
+		if status, ok := filters["status"]; ok && status != "" {
+			statusInt, err := strconv.Atoi(status)
+			if err != nil {
+				return false
+			}
+			if statusInt == 0 && mes.SubmitResult != 0 {
+				return false
+			}
+			if statusInt == 1 && mes.SubmitResult == 0 {
+				return false
+			}
+		}
+	} else if listName == "list_mo" {
+		// 上行消息特定过滤
+		if src, ok := filters["src"]; ok && src != "" {
+			if !contains(mes.Src, src) {
+				return false
+			}
+		}
+
+		if dest, ok := filters["dest"]; ok && dest != "" {
+			if !contains(mes.Dest, dest) {
+				return false
+			}
+		}
+	}
+
+	return true
+}
+
+// contains 检查字符串是否包含子字符串（不区分大小写）
+func contains(s, substr string) bool {
+	if len(substr) == 0 {
+		return true
+	}
+
+	// 简单的包含检查，可以根据需要扩展为更复杂的匹配
+	s = strings.ToLower(s)
+	substr = strings.ToLower(substr)
+	return strings.Contains(s, substr)
 }

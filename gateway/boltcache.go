@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
 	bolt "go.etcd.io/bbolt"
@@ -317,6 +319,154 @@ func (c *BoltCache) GetList(listName string, start, end int) *[]SmsMes {
 	})
 
 	return &result
+}
+
+// SearchList 在BoltDB中搜索消息列表
+func (c *BoltCache) SearchList(listName string, filters map[string]string, start, end int) *[]SmsMes {
+	result := make([]SmsMes, 0)
+
+	if c.db == nil {
+		return &result
+	}
+
+	// 先收集所有匹配的消息
+	var allMatches []SmsMes
+
+	c.db.View(func(tx *bolt.Tx) error {
+		var b *bolt.Bucket
+		switch listName {
+		case "list_message":
+			b = tx.Bucket(messageBucket)
+		case "list_mo":
+			b = tx.Bucket(moBucket)
+		default:
+			return nil
+		}
+
+		if b == nil {
+			return nil
+		}
+
+		// 遍历所有记录
+		cursor := b.Cursor()
+		for k, v := cursor.First(); k != nil; k, v = cursor.Next() {
+			mes := SmsMes{}
+			if err := json.Unmarshal(v, &mes); err != nil {
+				continue
+			}
+
+			if c.matchFilters(&mes, filters, listName) {
+				allMatches = append(allMatches, mes)
+			}
+		}
+
+		return nil
+	})
+
+	// 分页处理
+	if start < len(allMatches) {
+		end := end + 1
+		if end > len(allMatches) {
+			end = len(allMatches)
+		}
+		result = allMatches[start:end]
+	}
+
+	return &result
+}
+
+// GetSearchCount 获取搜索结果的数量
+func (c *BoltCache) GetSearchCount(listName string, filters map[string]string) int {
+	if c.db == nil {
+		return 0
+	}
+
+	count := 0
+
+	c.db.View(func(tx *bolt.Tx) error {
+		var b *bolt.Bucket
+		switch listName {
+		case "list_message":
+			b = tx.Bucket(messageBucket)
+		case "list_mo":
+			b = tx.Bucket(moBucket)
+		default:
+			return nil
+		}
+
+		if b == nil {
+			return nil
+		}
+
+		// 遍历所有记录并统计匹配的数量
+		cursor := b.Cursor()
+		for k, v := cursor.First(); k != nil; k, v = cursor.Next() {
+			mes := SmsMes{}
+			if err := json.Unmarshal(v, &mes); err != nil {
+				continue
+			}
+
+			if c.matchFilters(&mes, filters, listName) {
+				count++
+			}
+		}
+
+		return nil
+	})
+
+	return count
+}
+
+// matchFilters 检查消息是否匹配过滤条件
+func (c *BoltCache) matchFilters(mes *SmsMes, filters map[string]string, listName string) bool {
+	// 如果没有过滤条件，都匹配
+	if len(filters) == 0 {
+		return true
+	}
+
+	// 通用过滤条件
+	if content, ok := filters["content"]; ok && content != "" {
+		if !strings.Contains(strings.ToLower(mes.Content), strings.ToLower(content)) {
+			return false
+		}
+	}
+
+	if listName == "list_message" {
+		// 下发消息特定过滤
+		if dest, ok := filters["dest"]; ok && dest != "" {
+			if !strings.Contains(strings.ToLower(mes.Dest), strings.ToLower(dest)) {
+				return false
+			}
+		}
+
+		if status, ok := filters["status"]; ok && status != "" {
+			statusInt, err := strconv.Atoi(status)
+			if err != nil {
+				return false
+			}
+			if statusInt == 0 && mes.SubmitResult != 0 {
+				return false
+			}
+			if statusInt == 1 && mes.SubmitResult == 0 {
+				return false
+			}
+		}
+	} else if listName == "list_mo" {
+		// 上行消息特定过滤
+		if src, ok := filters["src"]; ok && src != "" {
+			if !strings.Contains(strings.ToLower(mes.Src), strings.ToLower(src)) {
+				return false
+			}
+		}
+
+		if dest, ok := filters["dest"]; ok && dest != "" {
+			if !strings.Contains(strings.ToLower(mes.Dest), strings.ToLower(dest)) {
+				return false
+			}
+		}
+	}
+
+	return true
 }
 
 // 工具函数：uint32 转 []byte

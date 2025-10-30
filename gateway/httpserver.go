@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/JoeCao/cmpp-gateway/pages"
 )
@@ -122,25 +123,71 @@ func listMessage(w http.ResponseWriter, r *http.Request, listName string, active
 	} else {
 		c_page, _ = strconv.Atoi(parameter)
 	}
-	count := SCache.Length(listName)
-	page := pages.NewPage(c_page, pageSize, count)
-	v := SCache.GetList(listName, page.StartRow, page.EndRow)
 
-    data := struct {
+	// 提取搜索参数
+	filters := make(map[string]string)
+	if listName == "list_message" {
+		if dest := r.Form.Get("dest"); dest != "" {
+			filters["dest"] = dest
+		}
+		if status := r.Form.Get("status"); status != "" {
+			filters["status"] = status
+		}
+	} else if listName == "list_mo" {
+		if src := r.Form.Get("src"); src != "" {
+			filters["src"] = src
+		}
+		if dest := r.Form.Get("dest"); dest != "" {
+			filters["dest"] = dest
+		}
+	}
+	if content := r.Form.Get("content"); content != "" {
+		filters["content"] = content
+	}
+
+	var count int
+	var v *[]SmsMes
+
+	// 如果有搜索条件，使用搜索功能
+	if len(filters) > 0 {
+		count = SCache.GetSearchCount(listName, filters)
+		page := pages.NewPage(c_page, pageSize, count)
+		v = SCache.SearchList(listName, filters, page.StartRow, page.EndRow)
+	} else {
+		// 普通分页查询
+		count = SCache.Length(listName)
+		page := pages.NewPage(c_page, pageSize, count)
+		v = SCache.GetList(listName, page.StartRow, page.EndRow)
+	}
+
+	data := struct {
 		ActivePage string
 		Data       *[]SmsMes
 		Page       pages.Page
-        ServiceReady bool
+		ServiceReady bool
+		Filters    map[string]string
 	}{
 		ActivePage: activePage,
 		Data:       v,
-		Page:       page,
-        ServiceReady: IsCmppReady(),
+		Page:       pages.Page{
+			CurrentPage:     c_page,
+			PageSize:        pageSize,
+			TotalRecord:     count,
+			TotalPage:       (count + pageSize - 1) / pageSize,
+			StartRow:        (c_page - 1) * pageSize,
+			EndRow:          c_page*pageSize - 1,
+			IsFirst:         c_page == 1,
+			IsEnd:           c_page >= (count+pageSize-1)/pageSize,
+			LastPage:        c_page - 1,
+			NextPage:        c_page + 1,
+		},
+		ServiceReady: IsCmppReady(),
+		Filters:      filters,
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-    if err := renderTemplate(w, listName, data); err != nil {
-        Errorf("[TPL] 渲染 %s 失败: %v", listName, err)
+	if err := renderTemplate(w, listName, data); err != nil {
+		Errorf("[TPL] 渲染 %s 失败: %v", listName, err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 	}
 }
@@ -202,6 +249,22 @@ func initTemplates() error {
 			}
 			return result
 		},
+		"buildPageURL": func(page int, filters map[string]string) string {
+			params := make([]string, 0, len(filters)+1)
+			params = append(params, fmt.Sprintf("page=%d", page))
+
+			for key, value := range filters {
+				if value != "" {
+					params = append(params, fmt.Sprintf("%s=%s", key, value))
+				}
+			}
+
+			if len(params) == 1 {
+				return "?page=" + strconv.Itoa(page)
+			}
+
+			return "?" + strings.Join(params, "&")
+		},
 	}
 
 	var err error
@@ -249,7 +312,8 @@ func Serve(cfg *Config) {
 		templates = nil
 	}
 
-	http.HandleFunc("/send", handler)
+	http.HandleFunc("/submit", handler)
+	http.HandleFunc("/send", handler) // 保持向后兼容
 	http.HandleFunc("/", index)
 	http.HandleFunc("/list_message", listSubmits)
 	http.HandleFunc("/list_mo", listMo)
