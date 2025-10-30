@@ -1,11 +1,12 @@
 package gateway
 
 import (
-	"log"
-	"strconv"
-	"time"
+    "log"
+    "strconv"
+    "sync/atomic"
+    "time"
 
-	cmpp "github.com/bigwhite/gocmpp"
+    cmpp "github.com/bigwhite/gocmpp"
 )
 
 const (
@@ -24,14 +25,23 @@ var config *Config
 // 全局的短信cmpp链接
 var c *cmpp.Client
 
+// 服务就绪状态（CMPP是否已连接可用）
+var cmppReady atomic.Bool
+
+func IsCmppReady() bool {
+    return cmppReady.Load()
+}
+
 func connectServer() {
 	c = cmpp.NewClient(cmpp.V30)
 	err := c.Connect(config.CMPPHost+":"+config.CMPPPort, config.User, config.Password, connectTimeout)
 	if err != nil {
 		log.Printf("client connect error: %s.", err)
+        cmppReady.Store(false)
 		return
 	}
 	log.Printf("client connect and auth ok")
+    cmppReady.Store(true)
 }
 
 func activeTimer() {
@@ -40,15 +50,28 @@ OuterLoop:
 	for {
 		select {
 		case <-ticker.C:
-			req := &cmpp.CmppActiveTestReqPkt{}
-			log.Printf("send test active rep to cmpp server %v", req)
-			_, err := c.SendReqPkt(req)
-			if err != nil {
-				log.Printf("send cmpp active response error: %s.", err)
-				log.Println("begin to reconnect")
-				connectServer()
-				go startReceiver()
-			}
+            // 未就绪则尝试重连，不发送心跳
+            if !IsCmppReady() || c == nil {
+                log.Printf("heartbeat: not ready, try reconnect")
+                cmppReady.Store(false)
+                connectServer()
+                if IsCmppReady() {
+                    go startReceiver()
+                }
+                break
+            }
+            req := &cmpp.CmppActiveTestReqPkt{}
+            log.Printf("send test active rep to cmpp server %v", req)
+            _, err := c.SendReqPkt(req)
+            if err != nil {
+                log.Printf("send cmpp active response error: %s.", err)
+                log.Println("begin to reconnect")
+                cmppReady.Store(false)
+                connectServer()
+                if IsCmppReady() {
+                    go startReceiver()
+                }
+            }
 		case <-Abort:
 			break OuterLoop
 		}
@@ -60,6 +83,12 @@ func startReceiver() {
 		if !isRunning() {
 			break
 		}
+        // 若未就绪则退出，等待心跳定时器重连成功后重启接收协程
+        if !IsCmppReady() {
+            log.Printf("CMPP 未就绪，退出receiver等待重连")
+            time.Sleep(time.Second)
+            break
+        }
 		// 检查连接是否有效
 		if c == nil {
 			log.Printf("client连接为空，退出receiver")
@@ -71,6 +100,7 @@ func startReceiver() {
 		if err != nil {
 			//connect断开后,Recv的不阻塞会导致cpu上升,需要退出goroutine,等待心跳重建接收
 			log.Printf("client : client read and unpack pkt error: %s.", err)
+            cmppReady.Store(false)
 			break
 		}
 
@@ -93,10 +123,11 @@ func startReceiver() {
 			err := c.SendRspPkt(rsp, p.SeqId)
 			if err != nil {
 				log.Printf("client : send cmpp active response error: %s.", err)
-
+                cmppReady.Store(false)
 			}
 		case *cmpp.CmppActiveTestRspPkt:
 			log.Printf("client : receive a cmpp activetest response: %v.", p)
+            cmppReady.Store(true)
 
 		case *cmpp.CmppTerminateReqPkt:
 			log.Printf("client : receive a cmpp terminate request: %v.", p)
@@ -219,7 +250,9 @@ func StartClient(gconfig *Config) {
 	config = gconfig
 	connectServer()
 	go startSender()
-	go startReceiver()
+    if IsCmppReady() {
+        go startReceiver()
+    }
 	go activeTimer()
 	defer c.Disconnect()
 	<-Abort

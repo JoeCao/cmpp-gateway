@@ -20,6 +20,14 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		log.Print(err)
 	}
+    // 服务未就绪时拒绝发送
+    if !IsCmppReady() {
+        w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+        result, _ := json.Marshal(
+            map[string]interface{}{"result": -2, "error": "CMPP 未连接，服务暂不可用"})
+        fmt.Fprintf(w, string(result))
+        return
+    }
 	src := r.Form.Get("src")
 	content := r.Form.Get("cont")
 	dest := r.Form.Get("dest")
@@ -56,12 +64,13 @@ func index(w http.ResponseWriter, r *http.Request) {
 		isRedisEnabled = true
 	}
 
-	data := struct {
+    data := struct {
 		ActivePage      string
 		Stats           map[string]int
 		Config          *Config
 		DefaultSrc      string
 		IsRedisEnabled  bool
+        ServiceReady    bool
 	}{
 		ActivePage: "home",
 		Stats: map[string]int{
@@ -72,7 +81,8 @@ func index(w http.ResponseWriter, r *http.Request) {
 		},
 		Config:         config,
 		DefaultSrc:     config.SmsAccessNo,
-		IsRedisEnabled: isRedisEnabled,
+        IsRedisEnabled: isRedisEnabled,
+        ServiceReady:   IsCmppReady(),
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -116,14 +126,16 @@ func listMessage(w http.ResponseWriter, r *http.Request, listName string, active
 	page := pages.NewPage(c_page, pageSize, count)
 	v := SCache.GetList(listName, page.StartRow, page.EndRow)
 
-	data := struct {
+    data := struct {
 		ActivePage string
 		Data       *[]SmsMes
 		Page       pages.Page
+        ServiceReady bool
 	}{
 		ActivePage: activePage,
 		Data:       v,
 		Page:       page,
+        ServiceReady: IsCmppReady(),
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")

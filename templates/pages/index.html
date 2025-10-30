@@ -106,14 +106,18 @@
             <div class="card-body">
                 <div class="row align-items-center">
                     <div class="col-auto">
-                        <div class="status-indicator status-online" style="width: 40px; height: 40px;"></div>
+                        <div class="status-indicator {{if .ServiceReady}}status-online{{else}}status-offline{{end}}" style="width: 40px; height: 40px;"></div>
                     </div>
                     <div class="col">
                         <h5 class="mb-1">CMPP 服务器</h5>
                         <p class="text-muted mb-0">{{.Config.CMPPHost}}:{{.Config.CMPPPort}}</p>
                     </div>
                     <div class="col-auto">
-                        <span class="badge bg-success fs-6">在线</span>
+                        {{if .ServiceReady}}
+                            <span class="badge bg-success fs-6">在线</span>
+                        {{else}}
+                            <span class="badge bg-danger fs-6">离线</span>
+                        {{end}}
                     </div>
                 </div>
                 <hr>

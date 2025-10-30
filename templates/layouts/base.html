@@ -164,6 +164,14 @@
 
     <main class="main-content">
         <div class="container-fluid">
+            {{if not .ServiceReady}}
+            <div class="alert alert-danger d-flex align-items-center" role="alert">
+                <span class="status-indicator status-offline"></span>
+                <div>
+                    短信下发服务暂不可用：未连接到 CMPP 网关。系统将自动重试，连接恢复后会自动可用。
+                </div>
+            </div>
+            {{end}}
             {{if eq .ActivePage "home"}}
                 {{template "index_content" .}}
             {{else if eq .ActivePage "list_message"}}
