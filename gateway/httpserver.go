@@ -49,11 +49,19 @@ func index(w http.ResponseWriter, r *http.Request) {
 	stats := SCache.GetStats()
 	totalReceived := SCache.Length("list_mo")
 
+	// 检查 Redis 是否启用
+	isRedisEnabled := config.CacheType == "redis"
+	// 或者通过类型断言检查 SCache 是否为 *Cache (Redis 实现)
+	if _, ok := SCache.(*Cache); ok {
+		isRedisEnabled = true
+	}
+
 	data := struct {
-		ActivePage string
-		Stats      map[string]int
-		Config     *Config
-		DefaultSrc string
+		ActivePage      string
+		Stats           map[string]int
+		Config          *Config
+		DefaultSrc      string
+		IsRedisEnabled  bool
 	}{
 		ActivePage: "home",
 		Stats: map[string]int{
@@ -62,8 +70,9 @@ func index(w http.ResponseWriter, r *http.Request) {
 			"TotalFailed":    stats["failed"],
 			"TotalReceived":  totalReceived,
 		},
-		Config:     config,
-		DefaultSrc: config.SmsAccessNo,
+		Config:         config,
+		DefaultSrc:     config.SmsAccessNo,
+		IsRedisEnabled: isRedisEnabled,
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")

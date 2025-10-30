@@ -117,16 +117,26 @@
                     </div>
                 </div>
                 <hr>
-                <div class="row align-items-center">
+                <div class="row align-items-center" {{if not .IsRedisEnabled}}style="opacity: 0.5;"{{end}}>
                     <div class="col-auto">
                         <i class="bi bi-database text-danger" style="font-size: 2rem;"></i>
                     </div>
                     <div class="col">
                         <h5 class="mb-1">Redis 缓存</h5>
-                        <p class="text-muted mb-0">{{.Config.RedisHost}}:{{.Config.RedisPort}}</p>
+                        <p class="text-muted mb-0">
+                            {{if .IsRedisEnabled}}
+                                {{.Config.RedisHost}}:{{.Config.RedisPort}}
+                            {{else}}
+                                未启用
+                            {{end}}
+                        </p>
                     </div>
                     <div class="col-auto">
-                        <span class="badge bg-success fs-6">在线</span>
+                        {{if .IsRedisEnabled}}
+                            <span class="badge bg-success fs-6">在线</span>
+                        {{else}}
+                            <span class="badge bg-secondary fs-6">未启用</span>
+                        {{end}}
                     </div>
                 </div>
             </div>
