@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"time"
 
 	bolt "go.etcd.io/bbolt"
@@ -48,14 +47,14 @@ func StartBoltCache(dbPath string) (*BoltCache, error) {
 		return nil, err
 	}
 
-	log.Printf("BoltDB 初始化成功: %s", dbPath)
+	Infof("[CACHE] BoltDB 初始化成功: %s", dbPath)
 	return &BoltCache{db: db}, nil
 }
 
 // StopBoltCache 关闭数据库
 func (c *BoltCache) StopBoltCache() error {
 	if c.db != nil {
-		log.Println("关闭 BoltDB")
+		Debugf("[CACHE] 关闭 BoltDB")
 		return c.db.Close()
 	}
 	return nil
@@ -64,7 +63,7 @@ func (c *BoltCache) StopBoltCache() error {
 // SetWaitCache 将发送的记录放到等待缓存中
 func (c *BoltCache) SetWaitCache(key uint32, message SmsMes) error {
 	if c.db == nil {
-		log.Printf("BoltDB not initialized, skipping SetWaitCache")
+		Warnf("[CACHE] BoltDB 未初始化，跳过 SetWaitCache")
 		return errors.New("database not initialized")
 	}
 
@@ -120,7 +119,7 @@ func (c *BoltCache) GetWaitCache(key uint32) (SmsMes, error) {
 // AddSubmits 添加提交消息到列表
 func (c *BoltCache) AddSubmits(mes *SmsMes) error {
 	if c.db == nil {
-		log.Printf("BoltDB not initialized, skipping AddSubmits")
+		Warnf("[CACHE] BoltDB 未初始化，跳过 AddSubmits")
 		return errors.New("database not initialized")
 	}
 
@@ -146,7 +145,7 @@ func (c *BoltCache) AddSubmits(mes *SmsMes) error {
 // AddMoList 添加MO消息到列表
 func (c *BoltCache) AddMoList(mes *SmsMes) error {
 	if c.db == nil {
-		log.Printf("BoltDB not initialized, skipping AddMoList")
+		Warnf("[CACHE] BoltDB 未初始化，跳过 AddMoList")
 		return errors.New("database not initialized")
 	}
 

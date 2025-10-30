@@ -1,7 +1,6 @@
 package gateway
 
 import (
-    "log"
     "strconv"
     "sync/atomic"
     "time"
@@ -35,12 +34,12 @@ func IsCmppReady() bool {
 func connectServer() {
 	c = cmpp.NewClient(cmpp.V30)
 	err := c.Connect(config.CMPPHost+":"+config.CMPPPort, config.User, config.Password, connectTimeout)
-	if err != nil {
-		log.Printf("client connect error: %s.", err)
+    if err != nil {
+        Errorf("[CMPP] 连接失败: %v", err)
         cmppReady.Store(false)
 		return
 	}
-	log.Printf("client connect and auth ok")
+    Infof("[CMPP] 连接与鉴权成功")
     cmppReady.Store(true)
 }
 
@@ -52,7 +51,7 @@ OuterLoop:
 		case <-ticker.C:
             // 未就绪则尝试重连，不发送心跳
             if !IsCmppReady() || c == nil {
-                log.Printf("heartbeat: not ready, try reconnect")
+                Warnf("[CMPP][HEARTBEAT] 未就绪，尝试重连")
                 cmppReady.Store(false)
                 connectServer()
                 if IsCmppReady() {
@@ -61,11 +60,10 @@ OuterLoop:
                 break
             }
             req := &cmpp.CmppActiveTestReqPkt{}
-            log.Printf("send test active rep to cmpp server %v", req)
+            Debugf("[CMPP][HEARTBEAT] 发送心跳: %+v", req)
             _, err := c.SendReqPkt(req)
             if err != nil {
-                log.Printf("send cmpp active response error: %s.", err)
-                log.Println("begin to reconnect")
+                Errorf("[CMPP][HEARTBEAT] 心跳发送失败: %v，开始重连", err)
                 cmppReady.Store(false)
                 connectServer()
                 if IsCmppReady() {
@@ -85,68 +83,68 @@ func startReceiver() {
 		}
         // 若未就绪则退出，等待心跳定时器重连成功后重启接收协程
         if !IsCmppReady() {
-            log.Printf("CMPP 未就绪，退出receiver等待重连")
+            Debugf("[CMPP][RECV] 未就绪，退出接收协程等待重连")
             time.Sleep(time.Second)
             break
         }
 		// 检查连接是否有效
-		if c == nil {
-			log.Printf("client连接为空，退出receiver")
+        if c == nil {
+            Warnf("[CMPP][RECV] 客户端连接为空，退出接收协程")
 			time.Sleep(time.Second) // 避免CPU空转
 			break
 		}
 		// recv packets
-		i, err := c.RecvAndUnpackPkt(0)
+        i, err := c.RecvAndUnpackPkt(0)
 		if err != nil {
 			//connect断开后,Recv的不阻塞会导致cpu上升,需要退出goroutine,等待心跳重建接收
-			log.Printf("client : client read and unpack pkt error: %s.", err)
+            Warnf("[CMPP][RECV] 读取/解包失败: %v，标记未就绪", err)
             cmppReady.Store(false)
 			break
 		}
 
 		switch p := i.(type) {
 		case *cmpp.Cmpp3SubmitRspPkt:
-			log.Printf("client : receive a cmpp3 submit response: %v.", p)
+            Infof("[CMPP][SUBMIT-RSP] 收到提交响应: MsgId=%d SeqId=%d Result=%d", p.MsgId, p.SeqId, p.Result)
 			//seqId := strconv.FormatUint(uint64(p.SeqId), 10)
 			//从redis中取出seqId为主键的对应发送消息
 			mes, err := SCache.GetWaitCache(p.SeqId)
 			if err == nil {
-				log.Printf("短信内容: %v, 发送状态 %d", mes, p.Result)
+                Debugf("[CMPP][SUBMIT-RSP] 匹配待回应消息: %+v, 状态=%d", mes, p.Result)
 				//根据短信网关的返回值给mes赋值
 				mes.MsgId = strconv.FormatUint(p.MsgId, 10)
 				mes.SubmitResult = p.Result
 				SCache.AddSubmits(&mes)
 			}
 		case *cmpp.CmppActiveTestReqPkt:
-			log.Printf("client : receive a cmpp active request: %v.", p)
+            Debugf("[CMPP][HEARTBEAT] 收到心跳请求: %+v", p)
 			rsp := &cmpp.CmppActiveTestRspPkt{}
 			err := c.SendRspPkt(rsp, p.SeqId)
 			if err != nil {
-				log.Printf("client : send cmpp active response error: %s.", err)
+                Errorf("[CMPP][HEARTBEAT] 心跳响应发送失败: %v", err)
                 cmppReady.Store(false)
 			}
 		case *cmpp.CmppActiveTestRspPkt:
-			log.Printf("client : receive a cmpp activetest response: %v.", p)
+            Debugf("[CMPP][HEARTBEAT] 收到心跳响应: %+v", p)
             cmppReady.Store(true)
 
 		case *cmpp.CmppTerminateReqPkt:
-			log.Printf("client : receive a cmpp terminate request: %v.", p)
+            Warnf("[CMPP] 收到连接终止请求: %+v", p)
 			rsp := &cmpp.CmppTerminateRspPkt{}
 			err := c.SendRspPkt(rsp, p.SeqId)
 			if err != nil {
-				log.Printf("client : send cmpp terminate response error: %s.", err)
+                Errorf("[CMPP] 终止响应发送失败: %v", err)
 				break
 			}
 		case *cmpp.CmppTerminateRspPkt:
-			log.Printf("client : receive a cmpp terminate response: %v.", p)
+            Infof("[CMPP] 收到终止响应: %+v", p)
 		case *cmpp.Cmpp3DeliverReqPkt:
-			log.Printf("client : receive a delivery report request: %v", p)
+            Infof("[CMPP][DELIVER] 收到上行/状态报告: MsgId=%d SeqId=%d", p.MsgId, p.SeqId)
 			rsp := &cmpp.Cmpp3DeliverRspPkt{}
 			rsp.MsgId = p.MsgId
 			rsp.Result = 0
 			err := c.SendRspPkt(rsp, p.SeqId)
 			if err != nil {
-				log.Printf("client: send cmpp delivery report request error: %s.", err)
+                Errorf("[CMPP][DELIVER] 回复失败: %v", err)
 			}
 
 			mes := SmsMes{}
@@ -167,21 +165,21 @@ func startSender() {
 OuterLoop:
 	for {
 		select {
-		case message := <-Messages:
-			log.Printf("收到待发送消息: Src=%s, Dest=%s, Content=%s", message.Src, message.Dest, message.Content)
+        case message := <-Messages:
+            Infof("[SEND] 待发送: Src=%s Dest=%s Content=%s", message.Src, message.Dest, message.Content)
 
 			// 构建实际的发送号码
 			// 如果用户提供了扩展码（src），将其附加到SrcId后面
 			srcId := config.SmsAccessNo
-			if message.Src != "" && message.Src != config.SmsAccessNo {
+            if message.Src != "" && message.Src != config.SmsAccessNo {
 				// 只有当 src 不是完整号码时才追加
 				srcId = config.SmsAccessNo + message.Src
-				log.Printf("使用扩展码: %s -> %s", message.Src, srcId)
+                Debugf("[SEND] 使用扩展码: %s -> %s", message.Src, srcId)
 			}
 
 			// 检查 SrcId 长度（CMPP协议要求最大21字节）
-			if len(srcId) > 21 {
-				log.Printf("错误: SrcId 长度超过21字节: %s (长度: %d)", srcId, len(srcId))
+            if len(srcId) > 21 {
+                Errorf("[SEND] SrcId 超过21字节: %s (len=%d)", srcId, len(srcId))
 				// 记录失败消息
 				message.Created = time.Now()
 				message.SubmitResult = 255 // 255表示本地错误
@@ -218,14 +216,14 @@ OuterLoop:
 			message.Created = time.Now()
 			message.DelivleryResult = 65535
 
-			if err != nil {
-				log.Printf("发送CMPP请求失败: %s", err)
+            if err != nil {
+                Errorf("[SEND] CMPP 请求发送失败: %v", err)
 				// 发送失败，直接记录到列表，标记为失败
 				message.SubmitResult = 254 // 254表示发送失败
 				message.MsgId = "SEND_ERROR"
 				SCache.AddSubmits(&message)
 			} else {
-				log.Printf("发送CMPP请求成功，等待响应 (SeqId: %d)", seq_id)
+                Infof("[SEND] 已发送，等待响应 SeqId=%d", seq_id)
 				// 发送成功，等待响应
 				message.SubmitResult = 65535 // 等待响应
 				SCache.SetWaitCache(seq_id, message)

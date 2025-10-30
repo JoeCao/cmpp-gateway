@@ -39,11 +39,11 @@ func InitCache(config *Config) {
 
 	if cacheType == "redis" {
 		// 使用 Redis
-		log.Println("使用 Redis 作为缓存后端")
+		Infof("[CACHE] 使用 Redis 作为缓存后端")
 		StartCache(config)
 	} else {
 		// 使用 BoltDB
-		log.Println("使用 BoltDB 作为缓存后端")
+		Infof("[CACHE] 使用 BoltDB 作为缓存后端")
 		dbPath := config.DBPath
 		if dbPath == "" {
 			dbPath = "./data/cmpp.db"
@@ -103,7 +103,7 @@ func StartCache(config *Config) {
 
 	cache := &Cache{pool: pool}
 	SCache = cache
-	log.Printf("连接Redis %s 成功", config.RedisHost+":"+config.RedisPort)
+	Infof("[CACHE] 连接 Redis 成功: %s", config.RedisHost+":"+config.RedisPort)
 }
 
 func StopCache() {
@@ -120,7 +120,7 @@ func StopCache() {
 // 将发送的记录转为json放到redis中保存下来,为异步返回的submit reponse做准备
 func (c *Cache) SetWaitCache(key uint32, message SmsMes) error {
 	if c.pool == nil {
-		log.Printf("Cache pool not initialized, skipping SetWaitCache")
+		Warnf("[CACHE] Redis 连接池未初始化，跳过 SetWaitCache")
 		return errors.New("cache pool not initialized")
 	}
 	conn := c.pool.Get()
@@ -154,7 +154,7 @@ func (c *Cache) GetWaitCache(key uint32) (SmsMes, error) {
 
 func (c *Cache) AddSubmits(mes *SmsMes) error {
 	if c.pool == nil {
-		log.Printf("Cache pool not initialized, skipping AddSubmits")
+		Warnf("[CACHE] Redis 连接池未初始化，跳过 AddSubmits")
 		return errors.New("cache pool not initialized")
 	}
 	conn := c.pool.Get()
@@ -171,7 +171,7 @@ func (c *Cache) AddSubmits(mes *SmsMes) error {
 
 func (c *Cache) AddMoList(mes *SmsMes) error {
 	if c.pool == nil {
-		log.Printf("Cache pool not initialized, skipping AddMoList")
+		Warnf("[CACHE] Redis 连接池未初始化，跳过 AddMoList")
 		return errors.New("cache pool not initialized")
 	}
 	conn := c.pool.Get()

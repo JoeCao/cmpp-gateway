@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
-	"log"
+    "log"
 	"net/http"
 	"path/filepath"
 	"strconv"
@@ -17,8 +17,8 @@ var templates *template.Template
 
 // handler echoes the HTTP request.
 func handler(w http.ResponseWriter, r *http.Request) {
-	if err := r.ParseForm(); err != nil {
-		log.Print(err)
+    if err := r.ParseForm(); err != nil {
+        Warnf("[HTTP] 解析表单失败: %v", err)
 	}
     // 服务未就绪时拒绝发送
     if !IsCmppReady() {
@@ -86,8 +86,8 @@ func index(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := renderTemplate(w, "index", data); err != nil {
-		log.Printf("Template execution error: %v", err)
+    if err := renderTemplate(w, "index", data); err != nil {
+        Errorf("[TPL] 渲染 index 失败: %v", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 	}
 }
@@ -139,8 +139,8 @@ func listMessage(w http.ResponseWriter, r *http.Request, listName string, active
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := renderTemplate(w, listName, data); err != nil {
-		log.Printf("Template execution error: %v", err)
+    if err := renderTemplate(w, listName, data); err != nil {
+        Errorf("[TPL] 渲染 %s 失败: %v", listName, err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 	}
 }
@@ -235,7 +235,7 @@ func initTemplates() error {
 		return fmt.Errorf("failed to parse templates: %v", err)
 	}
 
-	log.Printf("Loaded %d template files", len(allFiles))
+    Infof("[TPL] 加载模板文件 %d 个", len(allFiles))
 	return nil
 }
 
@@ -243,9 +243,8 @@ func Serve(cfg *Config) {
 	config = cfg
 
 	// Initialize templates
-	if err := initTemplates(); err != nil {
-		log.Printf("Warning: Failed to load new templates: %v", err)
-		log.Printf("Falling back to old template system")
+    if err := initTemplates(); err != nil {
+        Warnf("[TPL] 新模板加载失败: %v，回退旧模板系统", err)
 		// Set templates to nil to trigger fallback
 		templates = nil
 	}
@@ -256,6 +255,6 @@ func Serve(cfg *Config) {
 	http.HandleFunc("/list_mo", listMo)
 	http.HandleFunc("/api/stats", getStats)
 
-	log.Printf("HTTP server starting on %s:%s", config.HttpHost, config.HttpPort)
-	log.Fatal(http.ListenAndServe(config.HttpHost+":"+config.HttpPort, nil))
+    Infof("[HTTP] 服务启动: %s:%s", config.HttpHost, config.HttpPort)
+    log.Fatal(http.ListenAndServe(config.HttpHost+":"+config.HttpPort, nil))
 }
