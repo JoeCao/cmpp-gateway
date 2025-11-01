@@ -30,3 +30,6 @@ simulator/cmpp-simulator
 
 # BoltDB 数据文件
 data/
+
+# Release 构建文件
+releases/
