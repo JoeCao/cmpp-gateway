@@ -1,7 +1,10 @@
 package gateway
 
 import (
+	"errors"
 	"fmt"
+	"io"
+	"net"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -14,6 +17,8 @@ const (
 	defaultConnectTimeout = 2 * time.Second
 	// 心跳间隔
 	defaultHeartbeatInterval = 10 * time.Second
+	// 接收超时时间，避免阻塞无法退出
+	defaultReceiveTimeout = 2 * time.Second
 )
 
 // ClientManager 管理 CMPP 客户端连接的线程安全封装
@@ -31,6 +36,7 @@ type ClientManager struct {
 	// 接收协程控制
 	receiverRunning atomic.Bool
 	receiverStop    chan struct{}
+	receiverDone    chan struct{}
 	receiverMu      sync.Mutex // 保护 receiverStop 的创建和关闭
 
 	// 退出信号
@@ -156,27 +162,49 @@ func (cm *ClientManager) StartReceiver() {
 	cm.receiverMu.Lock()
 	cm.receiverStop = make(chan struct{})
 	stopChan := cm.receiverStop
+	doneChan := make(chan struct{})
+	cm.receiverDone = doneChan
 	cm.receiverMu.Unlock()
 
 	cm.wg.Add(1)
-	go func() {
+	go func(stopCh, doneCh chan struct{}) {
 		defer cm.wg.Done()
-		defer cm.receiverRunning.Store(false)
+		defer func() {
+			cm.receiverRunning.Store(false)
+			close(doneCh)
+			cm.receiverMu.Lock()
+			if cm.receiverStop == stopCh {
+				cm.receiverStop = nil
+			}
+			if cm.receiverDone == doneCh {
+				cm.receiverDone = nil
+			}
+			cm.receiverMu.Unlock()
+		}()
 
 		Infof("[CMPP][RECV] Receiver goroutine started")
-		cm.receiveLoop(stopChan)
+		cm.receiveLoop(stopCh)
 		Infof("[CMPP][RECV] Receiver goroutine stopped")
-	}()
+	}(stopChan, doneChan)
 }
 
 // StopReceiver 停止接收协程
 func (cm *ClientManager) StopReceiver() {
-	if cm.receiverRunning.Load() {
-		cm.receiverMu.Lock()
-		if cm.receiverStop != nil {
-			close(cm.receiverStop)
+	cm.receiverMu.Lock()
+	stopChan := cm.receiverStop
+	doneChan := cm.receiverDone
+	if stopChan != nil {
+		close(stopChan)
+		cm.receiverStop = nil
+	}
+	cm.receiverMu.Unlock()
+
+	if doneChan != nil {
+		select {
+		case <-doneChan:
+		case <-time.After(defaultReceiveTimeout + time.Second):
+			Warnf("[CMPP][RECV] Timed out waiting for receiver to stop")
 		}
-		cm.receiverMu.Unlock()
 	}
 }
 
@@ -191,24 +219,44 @@ func (cm *ClientManager) receiveLoop(stopChan chan struct{}) {
 			Debugf("[CMPP][RECV] Received shutdown signal")
 			return
 		default:
-			// 检查连接状态
-			if !cm.IsReady() {
-				Debugf("[CMPP][RECV] Client not ready, exiting receiver")
-				time.Sleep(time.Second)
-				return
-			}
-
-			// 接收并处理消息
-			pkt, err := cm.RecvAndUnpackPkt(0)
-			if err != nil {
-				Warnf("[CMPP][RECV] Receive/unpack failed: %v, marking not ready", err)
-				cm.ready.Store(false)
-				return
-			}
-
-			// 处理消息
-			cm.handlePacket(pkt)
 		}
+
+		// 检查连接状态
+		if !cm.IsReady() {
+			Debugf("[CMPP][RECV] Client not ready, waiting before retry")
+			select {
+			case <-time.After(200 * time.Millisecond):
+			case <-stopChan:
+				Debugf("[CMPP][RECV] Stop signal received while waiting for readiness")
+				return
+			case <-cm.shutdown:
+				Debugf("[CMPP][RECV] Shutdown signal received while waiting for readiness")
+				return
+			}
+			continue
+		}
+
+		// 接收并处理消息
+		pkt, err := cm.RecvAndUnpackPkt(defaultReceiveTimeout)
+		if err != nil {
+			if errors.Is(err, cmpp.ErrReadCmdIDTimeout) || errors.Is(err, cmpp.ErrReadPktBodyTimeout) {
+				continue
+			}
+			if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+				continue
+			}
+			if errors.Is(err, cmpp.ErrConnIsClosed) || errors.Is(err, io.EOF) {
+				Warnf("[CMPP][RECV] Connection closed: %v", err)
+				cm.ready.Store(false)
+				continue
+			}
+			Warnf("[CMPP][RECV] Receive/unpack failed: %v, marking not ready", err)
+			cm.ready.Store(false)
+			continue
+		}
+
+		// 处理消息
+		cm.handlePacket(pkt)
 	}
 }
 
