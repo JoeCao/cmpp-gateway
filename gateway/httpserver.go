@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"html/template"
-    "log"
+	"log"
 	"net/http"
 	"path/filepath"
 	"strconv"
@@ -18,23 +18,23 @@ var templates *template.Template
 
 // handler echoes the HTTP request.
 func handler(w http.ResponseWriter, r *http.Request) {
-    if err := r.ParseForm(); err != nil {
-        Warnf("[HTTP] 解析表单失败: %v", err)
-        w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-        result, _ := json.Marshal(
-            map[string]interface{}{"result": -1, "error": "请求格式错误"})
-        fmt.Fprintf(w, string(result))
-        return
+	if err := r.ParseForm(); err != nil {
+		Warnf("[HTTP] 解析表单失败: %v", err)
+		w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+		result, _ := json.Marshal(
+			map[string]interface{}{"result": -1, "error": "请求格式错误"})
+		fmt.Fprintf(w, string(result))
+		return
 	}
 
-    // 服务未就绪时拒绝发送
-    if !IsCmppReady() {
-        w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-        result, _ := json.Marshal(
-            map[string]interface{}{"result": -2, "error": "CMPP 未连接，服务暂不可用"})
-        fmt.Fprintf(w, string(result))
-        return
-    }
+	// 服务未就绪时拒绝发送
+	if !IsCmppReady() {
+		w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+		result, _ := json.Marshal(
+			map[string]interface{}{"result": -2, "error": "CMPP 未连接，服务暂不可用"})
+		fmt.Fprintf(w, string(result))
+		return
+	}
 
 	src := r.Form.Get("src")
 	content := r.Form.Get("cont")
@@ -42,7 +42,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 
 	// 参数验证（防止注入攻击和无效数据）
-	sanitizedContent, err := ValidateSubmitParams(src, dest, content)
+	validatedContent, err := ValidateSubmitParams(src, dest, content)
 	if err != nil {
 		Warnf("[HTTP] 参数验证失败: %v", err)
 		result, _ := json.Marshal(
@@ -51,7 +51,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	mes := SmsMes{Src: src, Content: sanitizedContent, Dest: dest}
+	mes := SmsMes{Src: src, Content: validatedContent, Dest: dest}
 	Messages <- mes
 	result, _ := json.Marshal(
 		map[string]interface{}{"error": "", "result": 0})
@@ -76,13 +76,13 @@ func index(w http.ResponseWriter, r *http.Request) {
 		isRedisEnabled = true
 	}
 
-    data := struct {
-		ActivePage      string
-		Stats           map[string]int
-		Config          *Config
-		DefaultSrc      string
-		IsRedisEnabled  bool
-        ServiceReady    bool
+	data := struct {
+		ActivePage     string
+		Stats          map[string]int
+		Config         *Config
+		DefaultSrc     string
+		IsRedisEnabled bool
+		ServiceReady   bool
 	}{
 		ActivePage: "home",
 		Stats: map[string]int{
@@ -93,13 +93,13 @@ func index(w http.ResponseWriter, r *http.Request) {
 		},
 		Config:         config,
 		DefaultSrc:     config.SmsAccessNo,
-        IsRedisEnabled: isRedisEnabled,
-        ServiceReady:   IsCmppReady(),
+		IsRedisEnabled: isRedisEnabled,
+		ServiceReady:   IsCmppReady(),
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-    if err := renderTemplate(w, "index", data); err != nil {
-        Errorf("[TPL] 渲染 index 失败: %v", err)
+	if err := renderTemplate(w, "index", data); err != nil {
+		Errorf("[TPL] 渲染 index 失败: %v", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 	}
 }
@@ -219,25 +219,25 @@ func listMessage(w http.ResponseWriter, r *http.Request, listName string, active
 	}
 
 	data := struct {
-		ActivePage string
-		Data       *[]SmsMes
-		Page       pages.Page
+		ActivePage   string
+		Data         *[]SmsMes
+		Page         pages.Page
 		ServiceReady bool
-		Filters    map[string]string
+		Filters      map[string]string
 	}{
 		ActivePage: activePage,
 		Data:       v,
-		Page:       pages.Page{
-			CurrentPage:     c_page,
-			PageSize:        pageSize,
-			TotalRecord:     count,
-			TotalPage:       (count + pageSize - 1) / pageSize,
-			StartRow:        (c_page - 1) * pageSize,
-			EndRow:          c_page*pageSize - 1,
-			IsFirst:         c_page == 1,
-			IsEnd:           c_page >= (count+pageSize-1)/pageSize,
-			LastPage:        c_page - 1,
-			NextPage:        c_page + 1,
+		Page: pages.Page{
+			CurrentPage: c_page,
+			PageSize:    pageSize,
+			TotalRecord: count,
+			TotalPage:   (count + pageSize - 1) / pageSize,
+			StartRow:    (c_page - 1) * pageSize,
+			EndRow:      c_page*pageSize - 1,
+			IsFirst:     c_page == 1,
+			IsEnd:       c_page >= (count+pageSize-1)/pageSize,
+			LastPage:    c_page - 1,
+			NextPage:    c_page + 1,
 		},
 		ServiceReady: IsCmppReady(),
 		Filters:      filters,
@@ -356,7 +356,7 @@ func initTemplates() error {
 		return fmt.Errorf("failed to parse templates: %v", err)
 	}
 
-    Infof("[TPL] 加载模板文件 %d 个", len(allFiles))
+	Infof("[TPL] 加载模板文件 %d 个", len(allFiles))
 	return nil
 }
 
@@ -364,8 +364,8 @@ func Serve(cfg *Config) {
 	config = cfg
 
 	// Initialize templates
-    if err := initTemplates(); err != nil {
-        Warnf("[TPL] 新模板加载失败: %v，回退旧模板系统", err)
+	if err := initTemplates(); err != nil {
+		Warnf("[TPL] 新模板加载失败: %v，回退旧模板系统", err)
 		// Set templates to nil to trigger fallback
 		templates = nil
 	}
@@ -377,6 +377,6 @@ func Serve(cfg *Config) {
 	http.HandleFunc("/list_mo", listMo)
 	http.HandleFunc("/api/stats", getStats)
 
-    Infof("[HTTP] 服务启动: %s:%s", config.HttpHost, config.HttpPort)
-    log.Fatal(http.ListenAndServe(config.HttpHost+":"+config.HttpPort, nil))
+	Infof("[HTTP] 服务启动: %s:%s", config.HttpHost, config.HttpPort)
+	log.Fatal(http.ListenAndServe(config.HttpHost+":"+config.HttpPort, nil))
 }

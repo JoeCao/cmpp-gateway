@@ -2,7 +2,6 @@ package gateway
 
 import (
 	"fmt"
-	"html"
 	"regexp"
 	"strconv"
 	"unicode/utf8"
@@ -48,9 +47,9 @@ func (e *ValidationError) Error() string {
 //   - content: 短信内容（必填）
 //
 // 返回:
-//   - sanitizedContent: 经过安全过滤的内容
+//   - normalizedContent: 与输入一致的内容（验证仅负责校验，不修改正文）
 //   - error: 验证失败时返回 ValidationError
-func ValidateSubmitParams(src, dest, content string) (sanitizedContent string, err error) {
+func ValidateSubmitParams(src, dest, content string) (normalizedContent string, err error) {
 	// 1. 验证目标号码（必填）
 	if dest == "" {
 		return "", &ValidationError{
@@ -91,12 +90,8 @@ func ValidateSubmitParams(src, dest, content string) (sanitizedContent string, e
 		}
 	}
 
-	// 5. 安全过滤：防止 HTML/JavaScript 注入
-	// 注意：这里只做基本的 HTML 转义，不影响短信内容本身
-	// 因为短信内容会编码为 GB18030 发送，不会在 HTML 中直接显示未转义的内容
-	sanitizedContent = html.EscapeString(content)
-
-	return sanitizedContent, nil
+	// 5. 验证通过后返回原始内容；HTML 转义交由模板渲染层处理，避免重复编码
+	return content, nil
 }
 
 // ValidateSearchParams 验证搜索参数

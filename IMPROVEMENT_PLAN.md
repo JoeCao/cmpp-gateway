@@ -147,7 +147,7 @@ go tool pprof http://localhost:8000/debug/pprof/goroutine
 - 手机号正则验证: `1[3-9]\d{9}`
 - 扩展码正则验证: `\d{1,6}`
 - 内容长度限制: 最大 500 字符
-- HTML 转义防止 XSS: `html.EscapeString()`
+- 校验阶段保持正文原文，依赖 `html/template` 自动转义防止 XSS
 - 分页参数验证: 1-10000 范围限制
 - 搜索参数验证: 关键词最大 100 字符
 

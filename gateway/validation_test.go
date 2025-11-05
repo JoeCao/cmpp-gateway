@@ -13,7 +13,7 @@ func TestValidateSubmitParams_Success(t *testing.T) {
 		src     string
 		dest    string
 		content string
-		want    string // 期望的 sanitized content
+		want    string // 期望的返回内容（保持原文）
 	}{
 		{
 			name:    "正常提交-无扩展码",
@@ -34,14 +34,14 @@ func TestValidateSubmitParams_Success(t *testing.T) {
 			src:     "",
 			dest:    "18600001234",
 			content: "<script>alert('xss')</script>",
-			want:    "&lt;script&gt;alert(&#39;xss&#39;)&lt;/script&gt;",
+			want:    "<script>alert('xss')</script>",
 		},
 		{
 			name:    "特殊字符",
 			src:     "1",
 			dest:    "15900000000",
 			content: "订单号: #12345 & 金额: ¥100",
-			want:    "订单号: #12345 &amp; 金额: ¥100",
+			want:    "订单号: #12345 & 金额: ¥100",
 		},
 		{
 			name:    "6位扩展码",
@@ -54,13 +54,13 @@ func TestValidateSubmitParams_Success(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			sanitized, err := ValidateSubmitParams(tt.src, tt.dest, tt.content)
+			content, err := ValidateSubmitParams(tt.src, tt.dest, tt.content)
 			if err != nil {
 				t.Errorf("ValidateSubmitParams() error = %v, want nil", err)
 				return
 			}
-			if sanitized != tt.want {
-				t.Errorf("ValidateSubmitParams() sanitized = %q, want %q", sanitized, tt.want)
+			if content != tt.want {
+				t.Errorf("ValidateSubmitParams() content = %q, want %q", content, tt.want)
 			}
 		})
 	}
@@ -507,7 +507,7 @@ func BenchmarkValidateSubmitParams_Success(b *testing.B) {
 	}
 }
 
-func BenchmarkValidateSubmitParams_HTMLEscape(b *testing.B) {
+func BenchmarkValidateSubmitParams_RawHTML(b *testing.B) {
 	content := "<script>alert('xss')</script>"
 	for i := 0; i < b.N; i++ {
 		ValidateSubmitParams("", "13800138000", content)
