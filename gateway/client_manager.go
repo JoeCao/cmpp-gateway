@@ -21,14 +21,63 @@ const (
 	defaultReceiveTimeout = 2 * time.Second
 )
 
+// cmppClient 抽象接口，便于单元测试注入 mock 实现
+type cmppClient interface {
+	Connect(addr, user, password string, timeout time.Duration) error
+	Disconnect()
+	SendReqPkt(p cmpp.Packer) (uint32, error)
+	SendRspPkt(p cmpp.Packer, seqId uint32) error
+	RecvAndUnpackPkt(timeout time.Duration) (interface{}, error)
+}
+
+// realCMPPClient 是对实际 gocmpp.Client 的封装
+type realCMPPClient struct {
+	inner *cmpp.Client
+}
+
+func (c *realCMPPClient) Connect(addr, user, password string, timeout time.Duration) error {
+	if c.inner == nil {
+		return fmt.Errorf("cmpp client not initialised")
+	}
+	return c.inner.Connect(addr, user, password, timeout)
+}
+
+func (c *realCMPPClient) Disconnect() {
+	if c.inner != nil {
+		c.inner.Disconnect()
+	}
+}
+
+func (c *realCMPPClient) SendReqPkt(p cmpp.Packer) (uint32, error) {
+	if c.inner == nil {
+		return 0, fmt.Errorf("cmpp client not initialised")
+	}
+	return c.inner.SendReqPkt(p)
+}
+
+func (c *realCMPPClient) SendRspPkt(p cmpp.Packer, seqId uint32) error {
+	if c.inner == nil {
+		return fmt.Errorf("cmpp client not initialised")
+	}
+	return c.inner.SendRspPkt(p, seqId)
+}
+
+func (c *realCMPPClient) RecvAndUnpackPkt(timeout time.Duration) (interface{}, error) {
+	if c.inner == nil {
+		return nil, fmt.Errorf("cmpp client not initialised")
+	}
+	return c.inner.RecvAndUnpackPkt(timeout)
+}
+
 // ClientManager 管理 CMPP 客户端连接的线程安全封装
 type ClientManager struct {
 	// 配置
 	config *Config
 
 	// CMPP 客户端（需要加锁保护）
-	client *cmpp.Client
-	mu     sync.RWMutex
+	client    cmppClient
+	newClient func() cmppClient
+	mu        sync.RWMutex
 
 	// 连接状态（使用 atomic 保证并发安全）
 	ready atomic.Bool
@@ -51,6 +100,9 @@ func NewClientManager(cfg *Config) *ClientManager {
 		config:       cfg,
 		shutdown:     make(chan struct{}),
 		receiverStop: make(chan struct{}),
+		newClient: func() cmppClient {
+			return &realCMPPClient{inner: cmpp.NewClient(cmpp.V30)}
+		},
 	}
 }
 
@@ -66,7 +118,7 @@ func (cm *ClientManager) Connect() error {
 	}
 
 	// 创建新连接
-	client := cmpp.NewClient(cmpp.V30)
+	client := cm.newClient()
 	addr := cm.config.CMPPHost + ":" + cm.config.CMPPPort
 	err := client.Connect(addr, cm.config.User, cm.config.Password, defaultConnectTimeout)
 
@@ -96,7 +148,7 @@ func (cm *ClientManager) Disconnect() {
 
 // GetClient 获取当前客户端（线程安全的读取）
 // 返回的客户端可能为 nil，调用者需要检查
-func (cm *ClientManager) GetClient() *cmpp.Client {
+func (cm *ClientManager) GetClient() cmppClient {
 	cm.mu.RLock()
 	defer cm.mu.RUnlock()
 	return cm.client
