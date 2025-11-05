@@ -10,13 +10,16 @@
 
 ## 第一阶段：修复严重问题 (P0)
 
-### 1. 修复并发安全问题 (P0)
+### 1. ✅ 修复并发安全问题 (P0) - 已完成
 **问题位置**: `gateway/client.go:34-44, 53-70`
 
 **问题描述**:
 - 全局变量 `c *cmpp.Client` 在多个 goroutine 中无锁写入
 - `activeTimer()` 和 `startReceiver()` 同时调用 `connectServer()` 会产生竞态
 - 可能导致: panic, 内存泄漏, 连接混乱
+
+**修复提交**: `f006df2` (feat: implement thread-safe ClientManager for CMPP connections)
+**修复方式**: 使用 `ClientManager` 封装 + `sync.RWMutex` + `atomic.Bool`
 
 **解决方案**:
 ```go
@@ -70,12 +73,19 @@ func (cm *ClientManager) IsReady() bool
 
 ---
 
-### 2. 修复 goroutine 泄漏 (P0)
+### 2. ✅ 修复 goroutine 泄漏 (P0) - 已完成
 **问题位置**: `gateway/client.go:58, 69`
 
 **问题描述**:
 - 重连时反复启动 `go startReceiver()` 但旧的可能未退出
 - 长时间运行会导致大量僵尸 goroutine
+
+**修复提交**: `b70c9da` (fix: 修复 ClientManager 并发安全问题)
+**修复方式**:
+- 使用 `atomic.Bool` + `CompareAndSwap` 防止重复启动
+- 引入 `receiverDone` channel 确保优雅退出
+- 添加 `defaultReceiveTimeout` 避免阻塞
+- 精细的错误分类处理（超时、断开、致命错误）
 
 **解决方案**:
 ```go
@@ -123,12 +133,23 @@ go tool pprof http://localhost:8000/debug/pprof/goroutine
 
 ---
 
-### 3. 修复 HTTP 注入风险 (P0)
+### 3. ✅ 修复 HTTP 注入风险 (P0) - 已完成
 **问题位置**: `gateway/httpserver.go:20-48`
 
 **问题描述**:
 - `src`, `dest`, `cont` 参数未验证直接使用
 - 可能注入攻击: XSS (模板注入), 超长内容导致费用损失
+
+**修复提交**: (当前提交)
+**修复方式**:
+- 新增 `gateway/validation.go` - 参数验证模块
+- 新增 `gateway/validation_test.go` - 完整的单元测试（100% 测试覆盖）
+- 手机号正则验证: `1[3-9]\d{9}`
+- 扩展码正则验证: `\d{1,6}`
+- 内容长度限制: 最大 500 字符
+- HTML 转义防止 XSS: `html.EscapeString()`
+- 分页参数验证: 1-10000 范围限制
+- 搜索参数验证: 关键词最大 100 字符
 
 **解决方案**:
 ```go

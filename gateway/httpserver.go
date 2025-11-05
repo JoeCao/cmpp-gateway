@@ -20,7 +20,13 @@ var templates *template.Template
 func handler(w http.ResponseWriter, r *http.Request) {
     if err := r.ParseForm(); err != nil {
         Warnf("[HTTP] 解析表单失败: %v", err)
+        w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+        result, _ := json.Marshal(
+            map[string]interface{}{"result": -1, "error": "请求格式错误"})
+        fmt.Fprintf(w, string(result))
+        return
 	}
+
     // 服务未就绪时拒绝发送
     if !IsCmppReady() {
         w.Header().Set("Content-Type", "application/json; charset=UTF-8")
@@ -29,18 +35,23 @@ func handler(w http.ResponseWriter, r *http.Request) {
         fmt.Fprintf(w, string(result))
         return
     }
+
 	src := r.Form.Get("src")
 	content := r.Form.Get("cont")
 	dest := r.Form.Get("dest")
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-	// src 是可选的，只检查 content 和 dest
-	if content == "" || dest == "" {
+
+	// 参数验证（防止注入攻击和无效数据）
+	sanitizedContent, err := ValidateSubmitParams(src, dest, content)
+	if err != nil {
+		Warnf("[HTTP] 参数验证失败: %v", err)
 		result, _ := json.Marshal(
-			map[string]interface{}{"result": -1, "error": "请输入参数 'dest' 和 'cont'"})
+			map[string]interface{}{"result": -1, "error": err.Error()})
 		fmt.Fprintf(w, string(result))
 		return
 	}
-	mes := SmsMes{Src: src, Content: content, Dest: dest}
+
+	mes := SmsMes{Src: src, Content: sanitizedContent, Dest: dest}
 	Messages <- mes
 	result, _ := json.Marshal(
 		map[string]interface{}{"error": "", "result": 0})
@@ -115,34 +126,52 @@ func findTemplate(w http.ResponseWriter, r *http.Request, tpl string) {
 }
 
 func listMessage(w http.ResponseWriter, r *http.Request, listName string, activePage string) {
-	r.ParseForm()
-	parameter := r.Form.Get("page")
-	var c_page int
-	if parameter == "" {
-		c_page = 1
-	} else {
-		c_page, _ = strconv.Atoi(parameter)
+	if err := r.ParseForm(); err != nil {
+		Warnf("[HTTP] 解析表单失败: %v", err)
+		http.Error(w, "请求格式错误", http.StatusBadRequest)
+		return
 	}
 
-	// 提取搜索参数
+	// 验证页码参数
+	parameter := r.Form.Get("page")
+	c_page, err := ValidatePageParam(parameter)
+	if err != nil {
+		Warnf("[HTTP] 页码验证失败: %v", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	// 提取并验证搜索参数
 	filters := make(map[string]string)
+	dest := r.Form.Get("dest")
+	src := r.Form.Get("src")
+	content := r.Form.Get("content")
+
+	// 根据列表类型设置过滤器
 	if listName == "list_message" {
-		if dest := r.Form.Get("dest"); dest != "" {
+		if dest != "" {
 			filters["dest"] = dest
 		}
 		if status := r.Form.Get("status"); status != "" {
 			filters["status"] = status
 		}
 	} else if listName == "list_mo" {
-		if src := r.Form.Get("src"); src != "" {
+		if src != "" {
 			filters["src"] = src
 		}
-		if dest := r.Form.Get("dest"); dest != "" {
+		if dest != "" {
 			filters["dest"] = dest
 		}
 	}
-	if content := r.Form.Get("content"); content != "" {
+	if content != "" {
 		filters["content"] = content
+	}
+
+	// 验证搜索参数
+	if err := ValidateSearchParams(dest, src, content); err != nil {
+		Warnf("[HTTP] 搜索参数验证失败: %v", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
 	}
 
 	var count int
