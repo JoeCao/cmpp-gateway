@@ -23,6 +23,9 @@ type Config struct {
 	CMPPPort string `json:"cmpp_port"`
 	Debug    bool   `json:"debug"`
 
+	// CMPP 协议版本："2.0" 或 "3.0"，默认为 "3.0"
+	CmppVersion string `json:"cmpp_version"`
+
 	// Redis 配置（可选，如果不配置则使用 BoltDB）
 	RedisHost     string `json:"redis_host"`
 	RedisPort     string `json:"redis_port"`

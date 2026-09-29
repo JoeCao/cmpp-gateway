@@ -116,6 +116,7 @@ func (h *TerminateHandler) ServeCmpp(r *cmpp.Response, p *cmpp.Packet, l *log.Lo
 func main() {
 	// Parse command line flags
 	flag.IntVar(&maxDelay, "delay", 3, "Maximum delay in seconds for submit response (1-30, default: 3)")
+	versionFlag := flag.String("version", "3.0", "CMPP protocol version: \"2.0\" or \"3.0\"")
 	flag.Parse()
 
 	// Validate delay parameter
@@ -126,8 +127,13 @@ func main() {
 	// Server configuration
 	addr := "127.0.0.1:7891" // Default CMPP port
 	typ := cmpp.V30          // CMPP 3.0 protocol
-	t := 30 * time.Second    // Active test interval
-	n := int32(3)            // Max no-response count before disconnect
+	versionName := "CMPP 3.0"
+	if *versionFlag == "2.0" || *versionFlag == "20" {
+		typ = cmpp.V20
+		versionName = "CMPP 2.0"
+	}
+	t := 30 * time.Second // Active test interval
+	n := int32(3)         // Max no-response count before disconnect
 
 	// Seed random for delay simulation
 	rand.Seed(time.Now().UnixNano())
@@ -141,10 +147,10 @@ func main() {
 	}
 
 	log.Printf("==========================================")
-	log.Printf("CMPP 3.0 Simulator Server")
+	log.Printf("%s Simulator Server", versionName)
 	log.Printf("==========================================")
 	log.Printf("Listening on: %s", addr)
-	log.Printf("Protocol: CMPP 3.0")
+	log.Printf("Protocol: %s", versionName)
 	log.Printf("Heartbeat interval: %v", t)
 	log.Printf("Submit delay: 1s - %ds (random)", maxDelay)
 	log.Printf("==========================================")

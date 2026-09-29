@@ -54,15 +54,27 @@ Ready to accept connections...
 模拟器默认配置：
 
 - **监听地址**: 127.0.0.1:7891
-- **协议版本**: CMPP 3.0
+- **协议版本**: CMPP 3.0（可用 `-version 2.0` 切换为 CMPP 2.0）
 - **心跳间隔**: 30秒
 - **心跳超时次数**: 3次
 
-如需修改配置，请编辑 `server.go` 中的 `main()` 函数：
+### 命令行参数
+
+```bash
+./cmpp-simulator -h
+#   -delay int
+#         Maximum delay in seconds for submit response (1-30, default: 3)
+#   -version string
+#         CMPP protocol version: "2.0" or "3.0" (default "3.0")
+
+# 启动 CMPP 2.0 模拟服务端
+./cmpp-simulator -version 2.0 -delay 1
+```
+
+如需修改监听地址、心跳间隔等其他配置，请编辑 `server.go` 中的 `main()` 函数：
 
 ```go
 addr := "127.0.0.1:7891"  // 修改监听地址和端口
-typ := cmpp.V30            // 修改协议版本 (V30 或 V20)
 t := 30 * time.Second      // 修改心跳间隔
 n := int32(3)              // 修改超时次数
 ```

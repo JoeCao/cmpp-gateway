@@ -9,6 +9,7 @@
   "cmpp_port": "7891",
   "debug": true,
   "cache_type": "boltdb",
-  "db_path": "./data/cmpp.db"
+  "db_path": "./data/cmpp.db",
+  "cmpp_version": "3.0"
 }
 

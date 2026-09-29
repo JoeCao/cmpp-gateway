@@ -2,8 +2,6 @@ package gateway
 
 import (
 	"time"
-
-	cmpp "github.com/bigwhite/gocmpp"
 )
 
 // 发送消息队列
@@ -60,29 +58,8 @@ OuterLoop:
 				continue
 			}
 
-			// 构建 CMPP 提交请求包
-			p := &cmpp.Cmpp3SubmitReqPkt{
-				PkTotal:            1,
-				PkNumber:           1,
-				RegisteredDelivery: 0,
-				MsgLevel:           1,
-				ServiceId:          config.ServiceId,
-				FeeUserType:        0,
-				FeeTerminalId:      "",
-				FeeTerminalType:    0,
-				MsgFmt:             0,
-				MsgSrc:             config.User, // MsgSrc应该是企业代码，即登录用户名（6字节）
-				FeeType:            "01",
-				FeeCode:            "000000",
-				ValidTime:          "",
-				AtTime:             "",
-				SrcId:              srcId,
-				DestUsrTl:          1,
-				DestTerminalId:     []string{message.Dest},
-				DestTerminalType:   0,
-				MsgLength:          uint8(len(message.Content)),
-				MsgContent:         message.Content,
-			}
+			// 构建 CMPP 提交请求包（根据配置的协议版本选择 2.0/3.0 包类型）
+			p := buildSubmitReqPkt(config, message, srcId)
 
 			// 使用 ClientManager 发送（线程安全）
 			seq_id, err := clientManager.SendReqPkt(p)

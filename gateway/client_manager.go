@@ -74,6 +74,9 @@ type ClientManager struct {
 	// 配置
 	config *Config
 
+	// CMPP 协议版本：cmpp.V20 或 cmpp.V30（由配置 cmpp_version 决定）
+	ver cmpp.Type
+
 	// CMPP 客户端（需要加锁保护）
 	client    cmppClient
 	newClient func() cmppClient
@@ -96,14 +99,21 @@ type ClientManager struct {
 
 // NewClientManager 创建一个新的客户端管理器
 func NewClientManager(cfg *Config) *ClientManager {
+	ver := ParseCmppVersion(cfg.CmppVersion)
 	return &ClientManager{
 		config:       cfg,
+		ver:          ver,
 		shutdown:     make(chan struct{}),
 		receiverStop: make(chan struct{}),
 		newClient: func() cmppClient {
-			return &realCMPPClient{inner: cmpp.NewClient(cmpp.V30)}
+			return &realCMPPClient{inner: cmpp.NewClient(ver)}
 		},
 	}
+}
+
+// Version 返回当前使用的 CMPP 协议版本（cmpp.V20 或 cmpp.V30）
+func (cm *ClientManager) Version() cmpp.Type {
+	return cm.ver
 }
 
 // Connect 连接到 CMPP 服务器（线程安全）
@@ -317,6 +327,8 @@ func (cm *ClientManager) handlePacket(pkt interface{}) {
 	switch p := pkt.(type) {
 	case *cmpp.Cmpp3SubmitRspPkt:
 		cm.handleSubmitRsp(p)
+	case *cmpp.Cmpp2SubmitRspPkt:
+		cm.handleSubmitRsp2(p)
 	case *cmpp.CmppActiveTestReqPkt:
 		cm.handleActiveTestReq(p)
 	case *cmpp.CmppActiveTestRspPkt:
@@ -327,25 +339,38 @@ func (cm *ClientManager) handlePacket(pkt interface{}) {
 		cm.handleTerminateRsp(p)
 	case *cmpp.Cmpp3DeliverReqPkt:
 		cm.handleDeliverReq(p)
+	case *cmpp.Cmpp2DeliverReqPkt:
+		cm.handleDeliverReq2(p)
 	default:
 		Debugf("[CMPP][RECV] Unknown packet type: %T", pkt)
 	}
 }
 
-// handleSubmitRsp 处理提交响应
+// handleSubmitRsp 处理提交响应（CMPP 3.0）
 func (cm *ClientManager) handleSubmitRsp(p *cmpp.Cmpp3SubmitRspPkt) {
-	Infof("[CMPP][SUBMIT-RSP] Received submit response: MsgId=%d SeqId=%d Result=%d", p.MsgId, p.SeqId, p.Result)
+	cm.onSubmitRsp(p.MsgId, p.SeqId, p.Result, "3.0")
+}
+
+// handleSubmitRsp2 处理提交响应（CMPP 2.0）
+// 2.0 的 Result 为 1 字节，3.0 为 4 字节，其余逻辑相同
+func (cm *ClientManager) handleSubmitRsp2(p *cmpp.Cmpp2SubmitRspPkt) {
+	cm.onSubmitRsp(p.MsgId, p.SeqId, uint32(p.Result), "2.0")
+}
+
+// onSubmitRsp 处理提交响应的公共逻辑
+func (cm *ClientManager) onSubmitRsp(msgId uint64, seqId uint32, result uint32, ver string) {
+	Infof("[CMPP][SUBMIT-RSP] Received submit response: MsgId=%d SeqId=%d Result=%d (CMPP %s)", msgId, seqId, result, ver)
 
 	// 从缓存中获取等待响应的消息
-	mes, err := SCache.GetWaitCache(p.SeqId)
+	mes, err := SCache.GetWaitCache(seqId)
 	if err == nil {
-		Debugf("[CMPP][SUBMIT-RSP] Matched pending message: %+v, Result=%d", mes, p.Result)
+		Debugf("[CMPP][SUBMIT-RSP] Matched pending message: %+v, Result=%d", mes, result)
 		// 更新消息状态
-		mes.MsgId = fmt.Sprintf("%d", p.MsgId)
-		mes.SubmitResult = p.Result
+		mes.MsgId = fmt.Sprintf("%d", msgId)
+		mes.SubmitResult = result
 		SCache.AddSubmits(&mes)
 	} else {
-		Warnf("[CMPP][SUBMIT-RSP] No pending message found for SeqId=%d: %v", p.SeqId, err)
+		Warnf("[CMPP][SUBMIT-RSP] No pending message found for SeqId=%d: %v", seqId, err)
 	}
 }
 
@@ -381,7 +406,7 @@ func (cm *ClientManager) handleTerminateRsp(p *cmpp.CmppTerminateRspPkt) {
 	Infof("[CMPP] Received terminate response: %+v", p)
 }
 
-// handleDeliverReq 处理上行消息/状态报告
+// handleDeliverReq 处理上行消息/状态报告（CMPP 3.0）
 func (cm *ClientManager) handleDeliverReq(p *cmpp.Cmpp3DeliverReqPkt) {
 	Infof("[CMPP][DELIVER] Received MO/delivery report: MsgId=%d SeqId=%d", p.MsgId, p.SeqId)
 
@@ -395,12 +420,34 @@ func (cm *ClientManager) handleDeliverReq(p *cmpp.Cmpp3DeliverReqPkt) {
 		Errorf("[CMPP][DELIVER] Failed to send response: %v", err)
 	}
 
-	// 保存上行消息
+	cm.saveDeliverMo(p.MsgId, p.SrcTerminalId, p.DestId, p.MsgContent)
+}
+
+// handleDeliverReq2 处理上行消息/状态报告（CMPP 2.0）
+// 2.0 的包体没有 SrcTerminalType/LinkId 字段，响应 Result 为 1 字节
+func (cm *ClientManager) handleDeliverReq2(p *cmpp.Cmpp2DeliverReqPkt) {
+	Infof("[CMPP][DELIVER] Received MO/delivery report: MsgId=%d SeqId=%d (CMPP 2.0)", p.MsgId, p.SeqId)
+
+	// 发送响应
+	rsp := &cmpp.Cmpp2DeliverRspPkt{
+		MsgId:  p.MsgId,
+		Result: 0,
+	}
+	err := cm.SendRspPkt(rsp, p.SeqId)
+	if err != nil {
+		Errorf("[CMPP][DELIVER] Failed to send response: %v", err)
+	}
+
+	cm.saveDeliverMo(p.MsgId, p.SrcTerminalId, p.DestId, p.MsgContent)
+}
+
+// saveDeliverMo 保存上行消息到缓存
+func (cm *ClientManager) saveDeliverMo(msgId uint64, src, dest, content string) {
 	mes := SmsMes{
-		MsgId:   fmt.Sprintf("%d", p.MsgId),
-		Src:     p.SrcTerminalId,
-		Dest:    p.DestId,
-		Content: p.MsgContent,
+		MsgId:   fmt.Sprintf("%d", msgId),
+		Src:     src,
+		Dest:    dest,
+		Content: content,
 		Created: time.Now(),
 	}
 	SCache.AddMoList(&mes)

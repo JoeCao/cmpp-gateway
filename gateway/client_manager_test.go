@@ -747,3 +747,207 @@ func TestClientManagerHandleActiveTestRsp(t *testing.T) {
 	// 注意：这个测试依赖于 handleActiveTestRsp 的实现
 	cm.Shutdown()
 }
+
+// TestClientManagerReceiveSubmitRspV20 测试接收循环处理 CMPP 2.0 提交响应
+func TestClientManagerReceiveSubmitRspV20(t *testing.T) {
+	// 初始化缓存（使用临时 BoltDB）
+	config := &Config{
+		CMPPHost:    "127.0.0.1",
+		CMPPPort:    "7891",
+		User:        "testuser",
+		Password:    "testpass",
+		CmppVersion: "2.0",
+		CacheType:   "boltdb",
+		DBPath:      "./data/test_v20.db",
+	}
+	InitCache(config)
+	defer func() {
+		// 清理测试数据库
+		if boltCache, ok := SCache.(*BoltCache); ok {
+			boltCache.StopBoltCache()
+		}
+		os.Remove("./data/test_v20.db")
+	}()
+
+	cm := NewClientManager(config)
+	if cm.Version() != cmpp.V20 {
+		t.Fatalf("expected V20 client manager, got %v", cm.Version())
+	}
+
+	// 使用 mock：模拟接收 2.0 提交响应
+	recvCount := 0
+	submitRsp := &cmpp.Cmpp2SubmitRspPkt{
+		MsgId:  987654321,
+		SeqId:  200,
+		Result: 0, // 2.0 的 Result 为 1 字节
+	}
+
+	cm.newClient = func() cmppClient {
+		return &mockClient{
+			connectFunc: func(addr, user, password string, timeout time.Duration) error {
+				return nil
+			},
+			recvFunc: func(timeout time.Duration) (interface{}, error) {
+				recvCount++
+				if recvCount == 1 {
+					return submitRsp, nil
+				}
+				// 第二次接收返回超时，让循环退出
+				return nil, cmpp.ErrReadCmdIDTimeout
+			},
+		}
+	}
+
+	// 连接并启动接收协程
+	if err := cm.Connect(); err != nil {
+		t.Fatalf("Connect failed: %v", err)
+	}
+
+	// 设置等待消息（模拟之前发送的短信）
+	testMes := SmsMes{
+		Src:     "123456",
+		Dest:    "13800138000",
+		Content: "v20 test message",
+		Created: time.Now(),
+	}
+	if err := SCache.SetWaitCache(200, testMes); err != nil {
+		t.Fatalf("Failed to set wait cache: %v", err)
+	}
+
+	cm.StartReceiver()
+
+	// 等待接收协程处理消息
+	time.Sleep(300 * time.Millisecond)
+
+	cm.StopReceiver()
+	cm.Shutdown()
+
+	// 验证消息被处理了
+	if recvCount == 0 {
+		t.Error("Expected RecvAndUnpackPkt to be called")
+	}
+
+	// 验证等待缓存已被消费（GetWaitCache 获取并删除）
+	if _, err := SCache.GetWaitCache(200); err == nil {
+		t.Error("Expected wait cache for seq 200 to be consumed after submit response")
+	}
+
+	// 验证 submits 列表中有处理后的消息，且 MsgId/SubmitResult 正确
+	list := SCache.GetList("list_message", 0, 10)
+	if list == nil {
+		t.Fatal("Expected non-nil list_message")
+	}
+	found := false
+	for _, m := range *list {
+		if m.MsgId == "987654321" && m.SubmitResult == 0 && m.Dest == "13800138000" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("Expected processed 2.0 submit message in list_message, got %+v", *list)
+	}
+}
+
+// TestClientManagerReceiveDeliverReqV20 测试接收循环处理 CMPP 2.0 上行/状态报告
+func TestClientManagerReceiveDeliverReqV20(t *testing.T) {
+	// 初始化缓存（使用临时 BoltDB）
+	config := &Config{
+		CMPPHost:    "127.0.0.1",
+		CMPPPort:    "7891",
+		User:        "testuser",
+		Password:    "testpass",
+		CmppVersion: "2.0",
+		CacheType:   "boltdb",
+		DBPath:      "./data/test_v20_mo.db",
+	}
+	InitCache(config)
+	defer func() {
+		// 清理测试数据库
+		if boltCache, ok := SCache.(*BoltCache); ok {
+			boltCache.StopBoltCache()
+		}
+		os.Remove("./data/test_v20_mo.db")
+	}()
+
+	cm := NewClientManager(config)
+
+	// 使用 mock：模拟接收 2.0 deliver 请求并捕获响应包
+	var sentRsp cmpp.Packer
+	var sentSeqId uint32
+	deliverReq := &cmpp.Cmpp2DeliverReqPkt{
+		MsgId:         1122334455,
+		DestId:        "1064899104221",
+		ServiceId:     "TEST",
+		SrcTerminalId: "13800138000",
+		MsgLength:     5,
+		MsgContent:    "hello",
+		SeqId:         300,
+	}
+
+	recvCount := 0
+	cm.newClient = func() cmppClient {
+		return &mockClient{
+			connectFunc: func(addr, user, password string, timeout time.Duration) error {
+				return nil
+			},
+			sendRspFunc: func(p cmpp.Packer, seqId uint32) error {
+				sentRsp = p
+				sentSeqId = seqId
+				return nil
+			},
+			recvFunc: func(timeout time.Duration) (interface{}, error) {
+				recvCount++
+				if recvCount == 1 {
+					return deliverReq, nil // 第一次返回 2.0 deliver 请求
+				}
+				// 第二次返回超时，让循环退出
+				return nil, cmpp.ErrReadCmdIDTimeout
+			},
+		}
+	}
+
+	// 连接并启动接收协程
+	if err := cm.Connect(); err != nil {
+		t.Fatalf("Connect failed: %v", err)
+	}
+
+	cm.StartReceiver()
+
+	// 等待接收协程处理消息
+	time.Sleep(300 * time.Millisecond)
+
+	cm.StopReceiver()
+	cm.Shutdown()
+
+	// 验证发送了 2.0 响应
+	if sentRsp == nil {
+		t.Fatal("Expected SendRspPkt to be called when handling 2.0 deliver req")
+	}
+	rsp, ok := sentRsp.(*cmpp.Cmpp2DeliverRspPkt)
+	if !ok {
+		t.Fatalf("Expected *cmpp.Cmpp2DeliverRspPkt, got %T", sentRsp)
+	}
+	if rsp.MsgId != 1122334455 || rsp.Result != 0 {
+		t.Errorf("Unexpected deliver rsp: MsgId=%d Result=%d", rsp.MsgId, rsp.Result)
+	}
+	if sentSeqId != 300 {
+		t.Errorf("Expected seqId 300, got %d", sentSeqId)
+	}
+
+	// 验证上行消息已保存到 list_mo
+	moList := SCache.GetList("list_mo", 0, 10)
+	if moList == nil {
+		t.Fatal("Expected non-nil list_mo")
+	}
+	found := false
+	for _, m := range *moList {
+		if m.MsgId == "1122334455" && m.Src == "13800138000" && m.Content == "hello" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("Expected 2.0 MO message in list_mo, got %+v", *moList)
+	}
+}

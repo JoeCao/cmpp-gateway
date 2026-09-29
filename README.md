@@ -195,6 +195,7 @@ go build -mod=mod -o cmpp-gateway
   "http_port": "8000",                 // HTTP 服务端口
   "cmpp_host": "127.0.0.1",            // CMPP 网关 IP 地址
   "cmpp_port": "7891",                 // CMPP 网关端口
+  "cmpp_version": "3.0",               // CMPP 协议版本："2.0" 或 "3.0"，默认为 "3.0"
   "debug": true,                       // 调试模式（生产环境建议设为 false）
   "cache_type": "boltdb",              // 缓存类型：boltdb（默认）或 redis
   "db_path": "./data/cmpp.db"          // BoltDB 数据文件路径
@@ -215,12 +216,37 @@ go build -mod=mod -o cmpp-gateway
   "http_port": "8000",
   "cmpp_host": "127.0.0.1",
   "cmpp_port": "7891",
+  "cmpp_version": "3.0",               // CMPP 协议版本："2.0" 或 "3.0"，默认为 "3.0"
   "debug": true,
   "cache_type": "redis",               // 指定使用 Redis
   "redis_host": "127.0.0.1",           // Redis 服务器地址
   "redis_port": "6379",                // Redis 端口
   "redis_password": ""                 // Redis 密码（如未设置密码则留空）
 }
+```
+
+#### CMPP 2.0 支持
+
+网关同时支持 CMPP 2.0 和 CMPP 3.0 协议，通过 `cmpp_version` 配置项切换：
+
+```json
+{
+  "cmpp_version": "2.0"
+}
+```
+
+- 可选值：`"2.0"` / `"3.0"`（也兼容 `"20"` / `"30"` / `"v2.0"` 等写法，不区分大小写）
+- 不配置或配置为空时默认为 `"3.0"`，与旧版本行为完全一致
+- 2.0 模式下连接认证、短信提交、提交响应、上行短信/状态报告均使用 2.0 包格式
+
+本地联调时，模拟器也支持切换协议版本：
+
+```bash
+# 启动 CMPP 2.0 模拟服务端
+./cmpp-simulator -version 2.0 -delay 1
+
+# 启动 CMPP 3.0 模拟服务端（默认）
+./cmpp-simulator -delay 2
 ```
 
 **⚠️ 安全提醒**：
