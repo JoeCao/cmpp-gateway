@@ -1,9 +1,9 @@
-# CMPP 3.0 HTTP 网关
+# CMPP HTTP 网关
 
 [![Go Version](https://img.shields.io/badge/Go-1.21%2B-blue.svg)](https://golang.org/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-一个高性能的 CMPP 3.0 协议网关，将中国移动的 CMPP（China Mobile Peer-to-Peer）协议转换为简洁的 HTTP API，为 Web 应用提供便捷的短信收发接口。
+一个高性能的 CMPP 协议网关，将中国移动的 CMPP（China Mobile Peer-to-Peer）协议转换为简洁的 HTTP API，为 Web 应用提供便捷的短信收发接口。支持 CMPP 2.0 / 3.0 双版本，通过配置项自由切换。
 
 ## 目录
 
@@ -28,7 +28,8 @@
 
 ## 功能特性
 
-- **协议转换**：将复杂的 CMPP 3.0 协议封装为简洁的 HTTP RESTful API
+- **协议转换**：将复杂的 CMPP 2.0/3.0 协议封装为简洁的 HTTP RESTful API
+- **双版本支持**：通过 `cmpp_version` 配置项在 CMPP 2.0 与 3.0 之间自由切换，默认 3.0
 - **高并发处理**：采用 Go 协程实现异步消息处理，单连接多路复用
 - **消息追踪**：基于嵌入式数据库实现 SEQID 和 MSGID 的完整追踪链路
 - **零外部依赖**：使用 BoltDB 嵌入式数据库，无需安装 Redis（也支持 Redis）
@@ -112,7 +113,7 @@
 ### 系统要求
 
 - **Go 语言环境**：1.21 或更高版本（仅开发时需要）
-- **CMPP 网关**：中国移动提供的 CMPP 3.0 网关（生产环境）或本地模拟器（开发测试）
+- **CMPP 网关**：中国移动提供的 CMPP 2.0/3.0 网关（生产环境）或本地模拟器（开发测试）
 - **可选**：Redis 服务器 3.0+（如果选择使用 Redis 而非默认的 BoltDB）
 
 ### 安装步骤
@@ -371,7 +372,7 @@ GOOS=darwin GOARCH=amd64 go build -o cmpp-gateway-darwin-amd64
 
 #### 使用内置模拟器（推荐）
 
-本项目在 `simulator/` 目录提供了开箱即用的 CMPP 3.0 模拟器：
+本项目在 `simulator/` 目录提供了开箱即用的 CMPP 2.0/3.0 模拟器（通过 `-version` 参数切换）：
 
 ```bash
 # 进入模拟器目录
@@ -385,7 +386,7 @@ go build -mod=vendor -o cmpp-simulator server.go
 ```
 
 **模拟器特性**：
-- ✅ 支持 CMPP 3.0 和 CMPP 2.0 协议
+- ✅ 支持 CMPP 2.0 / 3.0 双协议
 - ✅ 自动接受所有连接（无需预配置账号密码）
 - ✅ 处理短信提交请求并返回成功响应
 - ✅ 支持心跳保活机制
@@ -406,7 +407,7 @@ go build -mod=vendor -o cmpp-simulator server.go
 ### 核心技术栈
 
 - **语言框架**：Go 1.21+ with Go Modules
-- **协议实现**：[gocmpp](https://github.com/bigwhite/gocmpp) - CMPP 3.0 协议库
+- **协议实现**：[gocmpp](https://github.com/bigwhite/gocmpp) - CMPP 2.0/3.0 协议库
 - **缓存存储**：Redis - 消息状态追踪
 - **HTTP 服务**：Go 标准库 `net/http`
 - **字符编码**：GB18030（中国移动标准）
